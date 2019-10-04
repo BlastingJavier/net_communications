@@ -38,13 +38,13 @@ def procesa_paquete(us,header,data):
 	logging.info('Nuevo paquete de {} bytes capturado a las {}.{}'.format(header.len,header.ts.tv_sec,header.ts.tv_sec))
 	num_paquete += 1
 	print("Numero de paquete:", num_paquete)
-	byte_list = []
-	byte_list = list(struct.unpack('hhl', data))
+	#byte_list = []
+	#byte_list = list(struct.unpack('hhl', data))
 	for byte in range(nbytes):
-		print(byte_list[byte])
+		print(data[byte])
 
-	if pdumper is not None:
-		pdumper = pcap_dump(pdumper, )
+	#if pdumper is not None:
+	#	pdumper = pcap_dump(pdumper, )
 	#TODO imprimir los N primeros bytes
 	#Escribir el tráfico al fichero de captura con el offset temporal
 	
@@ -75,13 +75,13 @@ if __name__ == "__main__":
 	pdumper = None
 	nbytes = args.nbytes
 	if args.interface: #Que queremos capturar de interfaz
-		handle = pcap_open_live(args.itf, args.nbytes, 0, 100, errbuf)
+		handle = pcap_open_live(args.interface, args.nbytes, 0, 100, errbuf)
 		descriptor = pcap_open_dead(DLT_EN10MB, 1514)
 		fichero_captura = 'captura.{}.{}.pcap'.format(args.itf, time.ctime())
 		pdumper = pcap_dump_open(descriptor, fichero_captura)
 
 	elif args.tracefile:
-		handle = args.file;
+		handle = pcap_open_offline(args.tracefile, errbuf)
 	#TODO abrir la interfaz especificada para captura o la traza
 	#TODO abrir un dumper para volcar el tráfico (si se ha especificado interfaz) 
 	
