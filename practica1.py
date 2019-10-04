@@ -43,8 +43,10 @@ def procesa_paquete(us,header,data):
 	for byte in range(nbytes):
 		print(data[byte])
 
-	#if pdumper is not None:
-	#	pdumper = pcap_dump(pdumper, )
+	header.ts.tv_sec = header.ts.tv_sec + TIME_OFFSET
+
+	if pdumper is not None:
+		pcap_dump(pdumper, header, data)
 	#TODO imprimir los N primeros bytes
 	#Escribir el tráfico al fichero de captura con el offset temporal
 	
@@ -75,9 +77,15 @@ if __name__ == "__main__":
 	pdumper = None
 	nbytes = args.nbytes
 	if args.interface: #Que queremos capturar de interfaz
-		handle = pcap_open_live(args.interface, args.nbytes, 0, 100, errbuf)
-		descriptor = pcap_open_dead(DLT_EN10MB, 1514)
-		fichero_captura = 'captura.{}.{}.pcap'.format(args.itf, time.ctime())
+		print("paso por aqui")
+		print(args.interface)
+		handle = pcap_open_live(args.interface, args.nbytes, NO_PROMISC, TO_MS, errbuf)
+		if handle is None:
+			print("no se pudo capturar la interfaz de red ethernet")
+			sys.exit(-1)
+
+		descriptor = pcap_open_dead(DLT_EN10MB, ETH_FRAME_MAX) #te dice el tipo de ethernet 
+		fichero_captura = 'captura.{}.{}.pcap'.format(args.interface, time.time())
 		pdumper = pcap_dump_open(descriptor, fichero_captura)
 
 	elif args.tracefile:
@@ -98,3 +106,5 @@ if __name__ == "__main__":
 	#TODO si se ha creado un dumper cerrarlo
 	
 
+	pcap_close(handle)
+	pcap_dump_close(pdumper)
