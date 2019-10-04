@@ -1,10 +1,10 @@
 '''
-    practica1.py
-    Muestra el tiempo de llegada de los primeros 50 paquetes a la interfaz especificada
-    como argumento y los vuelca a traza nueva con tiempo actual
+	practica1.py
+	Muestra el tiempo de llegada de los primeros 50 paquetes a la interfaz especificada
+	como argumento y los vuelca a traza nueva con tiempo actual
 
-    Autor: Javier Ramos <javier.ramos@uam.es>
-    2019 EPS-UAM
+	Autor: Javier Ramos <javier.ramos@uam.es>
+	2019 EPS-UAM
 '''
 
 from rc1_pcap import *
@@ -41,7 +41,7 @@ def procesa_paquete(us,header,data):
 	#byte_list = []
 	#byte_list = list(struct.unpack('hhl', data))
 	for byte in range(nbytes):
-		print(data[byte])
+		print(data[byte].encode("hex") + ' ')
 
 	header.ts.tv_sec = header.ts.tv_sec + TIME_OFFSET
 
@@ -77,19 +77,28 @@ if __name__ == "__main__":
 	pdumper = None
 	nbytes = args.nbytes
 	if args.interface: #Que queremos capturar de interfaz
-		print("paso por aqui")
-		print(args.interface)
 		handle = pcap_open_live(args.interface, args.nbytes, NO_PROMISC, TO_MS, errbuf)
 		if handle is None:
-			print("no se pudo capturar la interfaz de red ethernet")
+			print("No se pudo capturar la interfaz de red ethernet")
 			sys.exit(-1)
 
-		descriptor = pcap_open_dead(DLT_EN10MB, ETH_FRAME_MAX) #te dice el tipo de ethernet 
+		descriptor = pcap_open_dead(DLT_EN10MB, ETH_FRAME_MAX) #te dice el tipo de ethernet
+		if descriptor is None:
+			print("Error creando el archivo donde volcar los paquetes")
+			sys.exit(-1)
+
 		fichero_captura = 'captura.{}.{}.pcap'.format(args.interface, time.time())
 		pdumper = pcap_dump_open(descriptor, fichero_captura)
+		if pdumper is None:
+			print("Error creando el dumper")
+			sys.exit(-1)
 
 	elif args.tracefile:
 		handle = pcap_open_offline(args.tracefile, errbuf)
+		if handle is None:
+			print("Error abriendo la traza previamente capturada")
+			sys.exit(-1)
+
 	#TODO abrir la interfaz especificada para captura o la traza
 	#TODO abrir un dumper para volcar el tráfico (si se ha especificado interfaz) 
 	
@@ -105,6 +114,11 @@ if __name__ == "__main__":
 	logging.info('{} paquetes procesados'.format(num_paquete))
 	#TODO si se ha creado un dumper cerrarlo
 	
+	if descriptor is not None:
+		pcap_close(descriptor)
 
-	pcap_close(handle)
-	pcap_dump_close(pdumper)
+	if handle is not None:
+		pcap_close(handle)
+
+	if pdumper is not None:
+		pcap_dump_close(pdumper)
