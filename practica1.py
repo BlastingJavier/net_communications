@@ -40,8 +40,20 @@ def procesa_paquete(us,header,data):
 	print("Numero de paquete:", num_paquete)
 	#byte_list = []
 	#byte_list = list(struct.unpack('hhl', data))
-	for byte in range(nbytes):
-		print(data[byte].encode("hex") + ' ')
+	strfinal='\0'
+
+	#Si el paquete es mas pequeño que el numero de bytes indicados en el argumento
+	if header.len < nbytes:
+		for byte in range(nbytes):
+			strHex = "0x%0.2X" % data[byte]
+			strfinal = strfinal+strHex+' '
+		print(strfinal)
+
+	else: 
+		for byte in range(nbytes):
+			strHex = "0x%0.2X" % data[byte]
+			strfinal = strfinal+strHex+' '
+		print(strfinal)
 
 	header.ts.tv_sec = header.ts.tv_sec + TIME_OFFSET
 
@@ -76,6 +88,8 @@ if __name__ == "__main__":
 	handle = None
 	pdumper = None
 	nbytes = args.nbytes
+	descriptor = None
+
 	if args.interface: #Que queremos capturar de interfaz
 		handle = pcap_open_live(args.interface, args.nbytes, NO_PROMISC, TO_MS, errbuf)
 		if handle is None:
