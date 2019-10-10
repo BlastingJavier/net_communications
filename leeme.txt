@@ -1,0 +1,23 @@
+Miguel Ángel Liaño
+Franciso Javier Nanclares
+
+Se entrega un archivo adicional nombrado UDP_only.pcap relacionado con el apartado 5 del ejercicio de Wireshark, mostrando su realización.
+
+Normativa de entrega cumplida en su totalidad: Realizado: Varias relecturas del enunciado.
+
+
+Contar paquetes de una traza: Realizado: Se ha comprobado que el número de paquete que muestra nuestro programa coincide con el que indica Wireshark.
+
+
+Contar paquetes de la interfaz de red: Realizado, en wireshark se puede visualizar el número de paquetes capturados.
+
+
+Almacenar en una traza el tráfico capturado en vivo: Realizado parcialmente: Se ha comprobado que la mayor parte de los bytes de la traza capturado coincide con lo que indica Wireshark en un conjunto diverso de paquetes.
+        
+Modificar fecha correctamente: Realizado, se incrementa haciendo uso de la constante TIME_OFFSET.
+
+
+Imprimir los N primeros bytes de un paquete y validarlo con Wireshark (captura de pantalla):Realizado: Se imprimen correctamente solamente los bytes deseados.
+
+
+Cuestionario "Ejercicios de captura de tráfico": Realizado, se incluye la memoria practica1.pdf explicando el proceso.
