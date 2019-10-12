@@ -23,6 +23,8 @@ TO_MS = 10
 broadcastAddr = bytes([0xFF]*6)
 #Diccionario que alamacena para un Ethertype dado qué función de callback se debe ejecutar
 upperProtos = {}
+ethertype1 = hex(0806)
+ethertype2 = hex(0800)
 
 def getHwAddr(interface):
     '''
@@ -70,11 +72,22 @@ def process_Ethernet_frame(us,header,data):
     logging.debug('Trama nueva. Función no implementada')
     for byte in range(header.len):
         if byte < destino_limit:
-            ethernet_origin.append(byte)
+            ethernet_destino.append(data[byte])
         elif byte < origin_limit:
-            ethernet_origin.append(byte)
+            ethernet_origin.append(data[byte])
         else:
-            ethertype.append(byte)
+            ethertype.append(data[byte])
+    if ethernet_destino != broadcastAddr or ethernet_destino == ethernet_origin:
+        return
+    else:
+        if upperProtos[ethertype1] == ethertype:
+            callback = upperProtos[ethertype1]
+            callback(us, header, data, ethernet_origin)
+        elif upperProtos[ethertype2] == ethertype:
+            callback = upperProtos[ethertype2]
+            callback(us, header, data, ethernet_origin)
+        else:
+            return
 
     #TODO: Implementar aquí el código que procesa una trama Ethernet en recepción
     
@@ -120,6 +133,7 @@ class rxThread(threading.Thread):
 
 def registerCallback(callback_func, ethertype):
     '''
+    --------->3
         Nombre: registerCallback
         Descripción: Esta función recibirá el nombre de una función y su valor de ethertype asociado y añadirá en la tabla 
             (diccionario) de protocolos de nivel superior el dicha asociación. 
@@ -138,13 +152,21 @@ def registerCallback(callback_func, ethertype):
             -ethertype: valor de Ethernetype para el cuál se quiere registrar una función de callback.
         Retorno: Ninguno 
     '''
-    global upperProtos
+
+    global upperProtos, ethertype1, ethertype2
+    if ethertype is not None and ethertype == ethertype1:
+        upperProtos[ethertype1] = callback_func
+    elif ethertype is not None and ethertype == ethertype2:
+        upperProtos[ethertype2] = callback_func
+
+    return
+
     #upperProtos es el diccionario que relaciona función de callback y ethertype
-    logging.debug('Función no implementada')
     
 
 def startEthernetLevel(interface):
     '''
+    1-------->
         Nombre: startEthernetLevel
         Descripción: Esta función recibe el nombre de una interfaz de red e inicializa el nivel Ethernet. 
             Esta función debe realizar , al menos, las siguientes tareas:
@@ -162,9 +184,9 @@ def startEthernetLevel(interface):
     errbuf = bytearray()
     logging.debug('Función no implementada')
     #TODO: implementar aquí la inicialización de la interfaz y de las variables globales
-    if macAddress:
+    if levelInitialized:
         return -1
-    macAddres = getHwAddr(interface)
+    macAddress = getHwAddr(interface)
     handle = pcap_open_live(interface, 50, PROMISC, TO_MS, errbuf)
     if handle is None:
         print("No se pudo capturar la interfaz de red")
@@ -176,11 +198,13 @@ def startEthernetLevel(interface):
     recvThread = rxThread()
     recvThread.daemon = True
     recvThread.start()
+    levelInitialized = True
     return 0
 
 def stopEthernetLevel():
     global macAddress,handle,levelInitialized,recvThread
     '''
+    2-------------->
         Nombre: stopEthernetLevel
         Descripción_ Esta función parará y liberará todos los recursos necesarios asociados al nivel Ethernet. 
             Esta función debe realizar, al menos, las siguientes tareas:
@@ -190,9 +214,9 @@ def stopEthernetLevel():
         Argumentos: Ninguno
         Retorno: 0 si todo es correcto y -1 en otro caso
     '''
-    if recvThread is None:
+    if recvThread is not None:
         recvThread.stop()
-    if handle:
+    if recvThread is not None:
         pcap_close(handle)
     levelInitialized = False
     return 0 #solo retorna 0 no -1 en otro caso
