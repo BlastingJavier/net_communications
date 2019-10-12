@@ -89,8 +89,26 @@ def processARPRequest(data,MAC):
             -MAC: dirección MAC origen extraída por el nivel Ethernet
         Retorno: Ninguno
     '''
-    logging.debug('Función no implementada')
-    #TODO implementar aquí
+    header_limit = 8
+    senderEth_limit = 14
+    senderIP_limit = 18
+    targetEth_limit = 24
+    targetIP_limit = 28
+
+    senderEth = bytearray()
+    senderIP = bytearray()
+    targetEth = bytearray()
+    targetIP = bytearray()
+    
+    senderEth = data[header_limit: senderEth_limit]
+    if senderEth != MAC:
+        logging.error("La MAC de origen es la misma que la de la trama ARP enviada")
+        return
+    senderIP = data[senderEth_limit: senderIP_limit]
+    senderIP = data[senderIP_limit: targetEth_limit]
+    senderIP = data[targetEth_limit: targetIP_limit]
+
+    
 def processARPReply(data,MAC):
     '''
         Nombre: processARPReply
@@ -115,9 +133,7 @@ def processARPReply(data,MAC):
         Retorno: Ninguno
     '''
     global requestedIP,resolvedMAC,awaitingResponse,cache
-    logging.debug('Función no implentada')    
-    #TODO implementar aquí
-        
+            
 
 
 
@@ -131,7 +147,7 @@ def createARPRequest(ip):
     '''
     global myMAC,myIP
     frame = bytes()
-    logging.debug('Función no implementada')
+    
     #TODO implementar aqui
     return frame
 
@@ -147,7 +163,7 @@ def createARPReply(IP,MAC):
     '''
     global myMAC,myIP
     frame = bytes()
-    logging.debug('Función no implementada')
+    
     #TODO implementar aqui
     return frame
 
@@ -171,10 +187,28 @@ def process_arp_frame(us,header,data,srcMac):
             -srcMac: MAC origen de la trama Ethernet que se ha recibido
         Retorno: Ninguno
     '''
-    logging.debug('Función no implementada')
-    #TODO implementar aquí
+    static_limit = 6 #los bytes que no cambian de una trama/ paquete de datos a otros
+    op_code_limit = 8
+    cabecera_ARP = bytearray()
+    opcode_ARP = bytearray()
 
 
+    for byte in range(header.len):
+        if byte < static_limit:
+            cabecera_ARP.append(data[byte])
+        elif byte < op_code_limit:
+            opcode_ARP.append(data[byte])
+        else:
+            return
+
+    if cabecera_ARP == ARPHeader and cabecera_ARP is not None:
+        if opcode_ARP == hex(0001):
+            processARPRequest(data, )
+        elif opcode_ARP == hex(0002):
+            processARPReply(data, )
+        else:
+            return 
+    #comprobacion de la cabecera de ARP
 
 def initARP(interface):
     '''
@@ -186,8 +220,16 @@ def initARP(interface):
             -Marcar la variable de nivel ARP inicializado a True
     '''
     global myIP,myMAC,arpInitialized
-    logging.debug('Función no implementada')
-    #TODO implementar aquí
+    registerCallback(process_arp_frame, hex(0806))
+
+    if interface is not None:
+        myMAC = getHwAddr(interface)
+        myIP = getIP(interface)
+
+    if createARPRequest(myIP) is not None: #Si la peticion arp gratuita se contesta se determina que la ip ya esta asignada
+        logging.error("arp gratuita realizada, error ip en uso")
+
+    arpInitialized = True
     return 0
 
 def ARPResolution(ip):
@@ -210,6 +252,10 @@ def ARPResolution(ip):
             Como estas variables globales se leen y escriben concurrentemente deben ser protegidas con un Lock
     '''
     global requestedIP,awaitingResponse,resolvedMAC
-    logging.debug('Función no implementada')
-    #TODO implementar aquí
+    if cache[ip] is not None:
+        return cache[ip]
+    else:
+        createARPRequest(ip)
+        #enviar peticion arp
+
     return None

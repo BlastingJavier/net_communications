@@ -65,18 +65,22 @@ def process_Ethernet_frame(us,header,data):
     '''
     destino_limit = 6
     origin_limit = 12
+    ethertype_limit = 14
     ethernet_destino = bytearray()
     ethernet_origin = bytearray()
     ethertype = bytearray()
 
-    logging.debug('Trama nueva. Función no implementada')
     for byte in range(header.len):
         if byte < destino_limit:
             ethernet_destino.append(data[byte])
         elif byte < origin_limit:
             ethernet_origin.append(data[byte])
-        else:
+        elif byte < ethertype_limit:
             ethertype.append(data[byte])
+        else:
+            return
+
+
     if ethernet_destino != broadcastAddr or ethernet_destino == ethernet_origin:
         return
     else:
@@ -182,7 +186,6 @@ def startEthernetLevel(interface):
     global macAddress,handle,levelInitialized,recvThread
     handle = None
     errbuf = bytearray()
-    logging.debug('Función no implementada')
     #TODO: implementar aquí la inicialización de la interfaz y de las variables globales
     if levelInitialized:
         return -1
@@ -239,8 +242,21 @@ def sendEthernetFrame(data,len,etherType,dstMac):
         Retorno: 0 si todo es correcto, -1 en otro caso
     '''
     global macAddress,handle
+    trama = bytearray()
 
+    if data is not None and len is not None and etherType is not None and dstMac is not None:
+        trama.append(dstMac) #Lo primero sera la direccion de destino de la Mac
+        if macAddres:
+            trama.append(macAddress) #Lo segundo sera la direccion de ethernet de origen
+        trama.append(etherType)
+        if len < ETH_FRAME_MIN:
+            trama.append(bytearray(ETH_FRAME_MIN)) #Creamos un bytearray vacio con todo ceros
+        elif len > ETH_FRAME_MAX:
+            logging.error("problema con el tamanyo de los datos especificados")
+            return -1
+        else:
+            trama.append(data)
 
-    logging.debug('Función no implementada')
-    
+    pcap_inject(trama)
+    return 0    
         
