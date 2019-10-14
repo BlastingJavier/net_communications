@@ -219,7 +219,7 @@ def stopEthernetLevel():
     '''
     if recvThread is not None:
         recvThread.stop()
-    if recvThread is not None:
+    if handle is not None:
         pcap_close(handle)
     levelInitialized = False
     return 0 #solo retorna 0 no -1 en otro caso
@@ -250,7 +250,7 @@ def sendEthernetFrame(data,len,etherType,dstMac):
             trama.append(macAddress) #Lo segundo sera la direccion de ethernet de origen
         trama.append(etherType)
         if len < ETH_FRAME_MIN:
-            trama.append(bytearray(ETH_FRAME_MIN)) #Creamos un bytearray vacio con todo ceros
+            trama.append(bytearray(ETH_FRAME_MIN)) #Rellenaos con 0's hasta cumplir con el tamaño minimo requerido
         elif len > ETH_FRAME_MAX:
             logging.error("problema con el tamanyo de los datos especificados")
             return -1
