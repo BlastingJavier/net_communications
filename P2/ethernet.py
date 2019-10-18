@@ -23,8 +23,8 @@ TO_MS = 10
 broadcastAddr = bytes([0xFF]*6)
 #Diccionario que alamacena para un Ethertype dado qué función de callback se debe ejecutar
 upperProtos = {}
-ethertype1 = hex(0806)
-ethertype2 = hex(0800)
+ethertype1 = "0x0806"
+ethertype2 = "0x0800"
 
 def getHwAddr(interface):
     '''
@@ -70,20 +70,11 @@ def process_Ethernet_frame(us,header,data):
     ethernet_origin = bytearray()
     ethertype = bytearray()
 
-    for byte in range(header.len):
-        if byte < destino_limit:
-            ethernet_destino.append(data[byte])
-        elif byte < origin_limit:
-            ethernet_origin.append(data[byte])
-        elif byte < ethertype_limit:
-            ethertype.append(data[byte])
-        else:
-            return
+    ethernet_destino = data[:destino_limit]
+    ethernet_origin = data[destino_limit:origin_limit]
+    ethertype = data[origin_limit:ethertype_limit]  
 
-
-    if ethernet_destino != broadcastAddr or ethernet_destino == ethernet_origin:
-        return
-    else:
+    if ethernet_destino == broadcastAddr or ethernet_destino == macAddress:
         if upperProtos[ethertype1] == ethertype:
             callback = upperProtos[ethertype1]
             callback(us, header, data, ethernet_origin)
@@ -92,6 +83,9 @@ def process_Ethernet_frame(us,header,data):
             callback(us, header, data, ethernet_origin)
         else:
             return
+    else:
+        return
+        
 
     #TODO: Implementar aquí el código que procesa una trama Ethernet en recepción
     
@@ -190,7 +184,7 @@ def startEthernetLevel(interface):
     if levelInitialized:
         return -1
     macAddress = getHwAddr(interface)
-    handle = pcap_open_live(interface, 50, PROMISC, TO_MS, errbuf)
+    handle = pcap_open_live(interface, ETH_FRAME_MAX, PROMISC, TO_MS, errbuf)
     if handle is None:
         print("No se pudo capturar la interfaz de red")
         return -1
@@ -244,19 +238,23 @@ def sendEthernetFrame(data,len,etherType,dstMac):
     global macAddress,handle
     trama = bytearray()
 
+
     if data is not None and len is not None and etherType is not None and dstMac is not None:
         trama.append(dstMac) #Lo primero sera la direccion de destino de la Mac
         if macAddres:
             trama.append(macAddress) #Lo segundo sera la direccion de ethernet de origen
-        trama.append(etherType)
-        if len < ETH_FRAME_MIN:
-            trama.append(bytearray(ETH_FRAME_MIN)) #Rellenaos con 0's hasta cumplir con el tamaño minimo requerido
-        elif len > ETH_FRAME_MAX:
-            logging.error("problema con el tamanyo de los datos especificados")
-            return -1
-        else:
-            trama.append(data)
 
-    pcap_inject(trama)
-    return 0    
-        
+        trama.append(etherType)
+        trama.append(data)
+        tamanyo_paquete = len(trama)
+        if tamanyo_paquete < ETH_FRAME_MIN:
+            trama.append(bytearray(ETH_FRAME_MIN-tamanyo_paquete)) #Rellenaos con 0's hasta cumplir con el tamaño minimo requerido
+        else: #tamanyo de la trama mayor que ETHER_FRAME_MAX    
+            logging.error("Problema con el tamanyo de los datos especificados")
+            return -1
+
+    inject_handler = pcap_inject(handle, trama, tamanyo_paquete)
+    if inject_handler == tamanyo_paquete:
+        return 0
+    else:
+        return -1        
