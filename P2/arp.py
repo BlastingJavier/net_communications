@@ -37,7 +37,10 @@ cacheLock = Lock()
 #Caché de ARP. Es un diccionario similar al estándar de Python solo que eliminará las entradas a los 10 segundos
 cache = ExpiringDict(max_len=100, max_age_seconds=10)
 
-
+hw_type = "0x0001"
+protocol_type = "0x0800"
+hw_size = "0x06"
+protocol_size = "0x04"
 
 def getIP(interface):
     '''
@@ -89,26 +92,36 @@ def processARPRequest(data,MAC):
             -MAC: dirección MAC origen extraída por el nivel Ethernet
         Retorno: Ninguno
     '''
+    global myIP
     header_limit = 8
     senderEth_limit = 14
     senderIP_limit = 18
     targetEth_limit = 24
     targetIP_limit = 28
+    goodeth_frame = 0
 
     senderEth = bytearray()
     senderIP = bytearray()
     targetEth = bytearray()
     targetIP = bytearray()
+
+    arp_reply = bytearray()                             #respuesta que vamos a enviar por el nivel de ethernet
     
-    senderEth = data[header_limit: senderEth_limit]
+    senderEth = data[header_limit: senderEth_limit]     #MAC origen
     if senderEth != MAC:
         logging.error("La MAC de origen es la misma que la de la trama ARP enviada")
         return
-    senderIP = data[senderEth_limit: senderIP_limit]
-    senderIP = data[senderIP_limit: targetEth_limit]
-    senderIP = data[targetEth_limit: targetIP_limit]
+    senderIP = data[senderEth_limit: senderIP_limit]    #IP origen
+    targetEth = data[senderIP_limit: targetEth_limit]
+    targetIP = data[targetEth_limit: targetIP_limit]
 
-    
+    if targetIP == myIP:                                #si esta ip es el destinatario del arp_request -> somos el equipo que contesta
+        arp_reply = createARPReply(senderIP, senderEth)             #enviamos una respuesta con el MAC del que nos envia y su ip
+        if sendEthernetFrame(arp_reply, len(data), "0x0086", senderEth) == goodeth_frame: #enviamos la trama arp con toda la informacion
+            logging.info("Trama ARPReply enviada correctamente")
+        else:
+            logging.error("Error al enviar la trama ARPReply -> ethernet level")
+
 def processARPReply(data,MAC):
     '''
         Nombre: processARPReply
@@ -134,7 +147,42 @@ def processARPReply(data,MAC):
     '''
     global requestedIP,resolvedMAC,awaitingResponse,cache
             
+    header_limit = 8
+    senderEth_limit = 14
+    senderIP_limit = 18
+    targetEth_limit = 24
+    targetIP_limit = 28
+    goodeth_frame = 0
 
+    senderEth = bytearray()
+    senderIP = bytearray()
+    targetEth = bytearray()
+    targetIP = bytearray()
+
+    arp_reply = bytearray()                             #respuesta que vamos a enviar por el nivel de ethernet
+    
+    senderEth = data[header_limit: senderEth_limit]     #MAC origen
+    if senderEth != MAC:
+        logging.error("La MAC de origen es la misma que la de la trama ARP enviada")
+        return
+    senderIP = data[senderEth_limit: senderIP_limit]    #IP origen
+    targetEth = data[senderIP_limit: targetEth_limit]
+    targetIP = data[targetEth_limit: targetIP_limit]
+
+    if targetIP == myIP:                                #si esta ip es el destinatario del arp_request -> somos el equipo que contesta
+        if senderIP == requestedIP:                     #si nos esta contestando al que le hemos enviado request
+            globalLock.acquire()
+            resolvedMAC = senderEth                   #esta es la direccion MAC por la que preguntamos -> resolvedMAC
+            cacheLock.acquire()
+            cache[senderIP] = resolvedMAC               #guardamos en la cache dicha combinacion
+            cacheLock.release()
+            awaitingResponse = False
+            requestedIP = None
+            globalLock.release()
+        if sendEthernetFrame(arp_reply, len(data), "0x0086", senderEth) == goodeth_frame: #enviamos la trama arp con toda la informacion
+            logging.info("Trama ARPReply enviada correctamente")
+        else:
+            logging.error("Error al enviar la trama ARPReply -> ethernet level")
 
 
 def createARPRequest(ip):
@@ -146,9 +194,16 @@ def createARPRequest(ip):
         Retorno: Bytes con el contenido de la trama de petición ARP
     '''
     global myMAC,myIP
-    frame = bytes()
+    frame = bytearray()
+    OpCode = "0x0001"           #opcode es 1 request
+    senderEth = myMAC           #lo enviamos nosotros
+    senderIP = myIP
+    targetEth = broadcastAddr   #enviamos a la direccion broadcast (para toda la subred)
+    targetIP = ip               #ip direccion a resolver (del equipo del que queremos saber la MAC)
+
+
+    frame.extend([hw_type, protocol_type, hw_size, protocol_size, OpCode, senderEth, senderIP, targetEth, targetIP])
     
-    #TODO implementar aqui
     return frame
 
     
@@ -162,6 +217,18 @@ def createARPReply(IP,MAC):
         Retorno: Bytes con el contenido de la trama de petición ARP
     '''
     global myMAC,myIP
+
+    frame = bytearray()
+    OpCode = "0x0002"           #opcode es 2 request
+    senderEth = myMAC           #lo enviamos nosotros
+    senderIP = myIP
+    targetEth = MAC             #contestamos a la direccion MAC que nos ha enviado la peticion 
+    targetIP = IP               #ip direccion a la que contestar
+
+
+    frame.extend([hw_type, protocol_type, hw_size, protocol_size, OpCode, senderEth, senderIP, targetEth, targetIP])
+    
+    
     frame = bytes()
     
     #TODO implementar aqui
@@ -187,29 +254,29 @@ def process_arp_frame(us,header,data,srcMac):
             -srcMac: MAC origen de la trama Ethernet que se ha recibido
         Retorno: Ninguno
     '''
-    static_limit = 6 #los bytes que no cambian de una trama/ paquete de datos a otros
+    type = 2 #los bytes que no cambian de una trama/ paquete de datos a otros
     op_code_limit = 8
-    cabecera_ARP = bytearray()
-    opcode_ARP = bytearray()
+    hw_type_ind = 2
+    type_proto_ind = 4
+    hw_size_ind = 5
+    proto_size_ind = 6
+
+    op_code_index = 8
+
+    if data[:hw_type_ind] == hw_type and data[hw_type_index:type_proto_ind] == protocol_type \
+        and data[type_proto_ind:hw_size_ind] == hw_size and data[hwSize_index:proto_size_ind] == protocol_size:
+        logging.info("cabecera de ARP correcta -> 6 primeros bytes")
+    else:
+        logging.error("Cabecera erronea, trama incorrecta -> 6 primeros bytes")
 
 
-    for byte in range(header.len):
-        if byte < static_limit:
-            cabecera_ARP.append(data[byte])
-        elif byte < op_code_limit:
-            opcode_ARP.append(data[byte])
-        else:
-            return
-
-    if cabecera_ARP == ARPHeader and cabecera_ARP is not None:
-        if opcode_ARP == hex(0001):
-            processARPRequest(data, )
-        elif opcode_ARP == hex(0002):
-            processARPReply(data, )
-        else:
-            return 
-    #comprobacion de la cabecera de ARP
-
+    if data[proto_size_ind:op_code_index] == "0x0001":
+        processARPRequest(data, srcMac)                     #request
+    elif data[proto_size_ind:op_code_index] == "0x0002":
+        processARPReply(data, srcMac)                       #reply
+    else:
+        return
+    
 def initARP(interface):
     '''
         Nombre: initARP
@@ -220,7 +287,7 @@ def initARP(interface):
             -Marcar la variable de nivel ARP inicializado a True
     '''
     global myIP,myMAC,arpInitialized
-    registerCallback(process_arp_frame, hex(0806))
+    registerCallback(process_arp_frame, "0x0806")
 
     if interface is not None:
         myMAC = getHwAddr(interface)
@@ -252,10 +319,11 @@ def ARPResolution(ip):
             Como estas variables globales se leen y escriben concurrentemente deben ser protegidas con un Lock
     '''
     global requestedIP,awaitingResponse,resolvedMAC
+    arp_request = bytearray()
     if cache[ip] is not None:
         return cache[ip]
     else:
-        createARPRequest(ip)
+        arp_request = createARPRequest(ip)
         #enviar peticion arp
 
     return None
