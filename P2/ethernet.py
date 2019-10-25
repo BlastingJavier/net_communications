@@ -75,10 +75,10 @@ def process_Ethernet_frame(us,header,data):
     ethertype = data[origin_limit:ethertype_limit]
 
     if ethernet_destino == broadcastAddr or ethernet_destino == macAddress:
-        if upperProtos[ethertype1] == ethertype:
+        if ethertype1 == ethertype:
             callback = upperProtos[ethertype1]
             callback(us, header, data, ethernet_origin)
-        elif upperProtos[ethertype2] == ethertype:
+        elif ethertype2 == ethertype:
             callback = upperProtos[ethertype2]
             callback(us, header, data, ethernet_origin)
         else:

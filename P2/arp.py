@@ -15,6 +15,7 @@ import fcntl
 import time
 from threading import Lock
 from expiringdict import ExpiringDict
+from time import sleep
 
 #Semáforo global
 globalLock =Lock()
@@ -186,6 +187,7 @@ def processARPReply(data,MAC):
         else:
             logging.error("Error al enviar la trama ARPReply -> ethernet level")
 
+    return
 
 def createARPRequest(ip):
     '''
@@ -326,6 +328,15 @@ def ARPResolution(ip):
         return cache[ip]
     else:
         arp_request = createARPRequest(ip)
-        #enviar peticion arp
+        if sendEthernetFrame(arp_request,len(arp_request), "0x0806", broadcastAddr) == -1:
+            return None
 
-    return None
+        with globalLock:
+            awaitingResponse = True
+
+        for i in range(3):
+            sleep(0.05)
+            if awaitingResponse == True:
+                sendEthernetFrame(arp_request,len(arp_request), "0x0806", broadcastAddr)
+            else:
+                return resolvedMAC
