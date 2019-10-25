@@ -16,7 +16,7 @@ import time
 from threading import Lock
 from expiringdict import ExpiringDict
 
-#Semáforo global 
+#Semáforo global
 globalLock =Lock()
 #Dirección de difusión (Broadcast)
 broadcastAddr = bytes([0xFF]*6)
@@ -106,7 +106,7 @@ def processARPRequest(data,MAC):
     targetIP = bytearray()
 
     arp_reply = bytearray()                             #respuesta que vamos a enviar por el nivel de ethernet
-    
+
     senderEth = data[header_limit: senderEth_limit]     #MAC origen
     if senderEth != MAC:
         logging.error("La MAC de origen es la misma que la de la trama ARP enviada")
@@ -121,6 +121,8 @@ def processARPRequest(data,MAC):
             logging.info("Trama ARPReply enviada correctamente")
         else:
             logging.error("Error al enviar la trama ARPReply -> ethernet level")
+    else:
+        return
 
 def processARPReply(data,MAC):
     '''
@@ -146,7 +148,7 @@ def processARPReply(data,MAC):
         Retorno: Ninguno
     '''
     global requestedIP,resolvedMAC,awaitingResponse,cache
-            
+
     header_limit = 8
     senderEth_limit = 14
     senderIP_limit = 18
@@ -160,7 +162,7 @@ def processARPReply(data,MAC):
     targetIP = bytearray()
 
     arp_reply = bytearray()                             #respuesta que vamos a enviar por el nivel de ethernet
-    
+
     senderEth = data[header_limit: senderEth_limit]     #MAC origen
     if senderEth != MAC:
         logging.error("La MAC de origen es la misma que la de la trama ARP enviada")
@@ -189,8 +191,8 @@ def createARPRequest(ip):
     '''
         Nombre: createARPRequest
         Descripción: Esta función construye una petición ARP y devuelve la trama con el contenido.
-        Argumentos: 
-            -ip: dirección a resolver 
+        Argumentos:
+            -ip: dirección a resolver
         Retorno: Bytes con el contenido de la trama de petición ARP
     '''
     global myMAC,myIP
@@ -203,15 +205,15 @@ def createARPRequest(ip):
 
 
     frame.extend([hw_type, protocol_type, hw_size, protocol_size, OpCode, senderEth, senderIP, targetEth, targetIP])
-    
+
     return frame
 
-    
+
 def createARPReply(IP,MAC):
     '''
         Nombre: createARPReply
         Descripción: Esta función construye una respuesta ARP y devuelve la trama con el contenido.
-        Argumentos: 
+        Argumentos:
             -IP: dirección IP a la que contestar
             -MAC: dirección MAC a la que contestar
         Retorno: Bytes con el contenido de la trama de petición ARP
@@ -222,15 +224,15 @@ def createARPReply(IP,MAC):
     OpCode = "0x0002"           #opcode es 2 request
     senderEth = myMAC           #lo enviamos nosotros
     senderIP = myIP
-    targetEth = MAC             #contestamos a la direccion MAC que nos ha enviado la peticion 
+    targetEth = MAC             #contestamos a la direccion MAC que nos ha enviado la peticion
     targetIP = IP               #ip direccion a la que contestar
 
 
     frame.extend([hw_type, protocol_type, hw_size, protocol_size, OpCode, senderEth, senderIP, targetEth, targetIP])
-    
-    
+
+
     frame = bytes()
-    
+
     #TODO implementar aqui
     return frame
 
@@ -238,8 +240,8 @@ def createARPReply(IP,MAC):
 def process_arp_frame(us,header,data,srcMac):
     '''
         Nombre: process_arp_frame
-        Descripción: Esta función procesa las tramas ARP. 
-            Se ejecutará por cada trama Ethenet que se reciba con Ethertype 0x0806 (si ha sido registrada en initARP). 
+        Descripción: Esta función procesa las tramas ARP.
+            Se ejecutará por cada trama Ethenet que se reciba con Ethertype 0x0806 (si ha sido registrada en initARP).
             Esta función debe realizar, al menos, las siguientes tareas:
                 -Extraer la cabecera común de ARP (6 primeros bytes) y comprobar que es correcta
                 -Extraer el campo opcode
@@ -276,7 +278,7 @@ def process_arp_frame(us,header,data,srcMac):
         processARPReply(data, srcMac)                       #reply
     else:
         return
-    
+
 def initARP(interface):
     '''
         Nombre: initARP
@@ -302,7 +304,7 @@ def initARP(interface):
 def ARPResolution(ip):
     '''
         Nombre: ARPResolution
-        Descripción: Esta función intenta realizar una resolución ARP para una IP dada y devuelve la dirección MAC asociada a dicha IP 
+        Descripción: Esta función intenta realizar una resolución ARP para una IP dada y devuelve la dirección MAC asociada a dicha IP
             o None en caso de que no haya recibido respuesta. Esta función debe realizar, al menos, las siguientes tareas:
                 -Comprobar si la IP solicitada existe en la caché:
                 -Si está en caché devolver la información de la caché
