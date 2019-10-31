@@ -23,8 +23,8 @@ TO_MS = 10
 broadcastAddr = bytes([0xFF]*6)
 #Diccionario que alamacena para un Ethertype dado qué función de callback se debe ejecutar
 upperProtos = {}
-ethertype1 = "0x0806"
-ethertype2 = "0x0800"
+ethertype1 = b'\x08\x06'
+ethertype2 = b'\x08\x00'
 
 def getHwAddr(interface):
     '''
@@ -180,9 +180,8 @@ def startEthernetLevel(interface):
     global macAddress,handle,levelInitialized,recvThread
     handle = None
     errbuf = bytearray()
+    levelInitialized = False
     #TODO: implementar aquí la inicialización de la interfaz y de las variables globales
-    if levelInitialized:
-        return -1
     macAddress = getHwAddr(interface)
     handle = pcap_open_live(interface, ETH_FRAME_MAX, PROMISC, TO_MS, errbuf)
     if handle is None:
@@ -240,8 +239,9 @@ def sendEthernetFrame(data,len,etherType,dstMac):
 
 
     if data is not None and len is not None and etherType is not None and dstMac is not None:
-        trama.append(dstMac) #Lo primero sera la direccion de destino de la Mac
-        if macAddres:
+        trama += dstMac #Lo primero sera la direccion de destino de la Mac
+        #print(macAddres)
+        if macAddres is not None:
             trama.append(macAddress) #Lo segundo sera la direccion de ethernet de origen
 
         trama.append(etherType)
