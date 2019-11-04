@@ -25,6 +25,7 @@ broadcastAddr = bytes([0xFF]*6)
 upperProtos = {}
 ethertype1 = b'\x08\x06'
 ethertype2 = b'\x08\x00'
+macAddres = None
 
 def getHwAddr(interface):
     '''
@@ -217,7 +218,7 @@ def stopEthernetLevel():
     levelInitialized = False
     return 0 #solo retorna 0 no -1 en otro caso
 
-def sendEthernetFrame(data,len,etherType,dstMac):
+def sendEthernetFrame(data,leng,etherType,dstMac):
     '''
         Nombre: sendEthernetFrame
         Descripción: Esta función construirá una trama Ethernet con lo datos recibidos y la enviará por la interfaz de red.
@@ -238,17 +239,17 @@ def sendEthernetFrame(data,len,etherType,dstMac):
     trama = bytearray()
 
 
-    if data is not None and len is not None and etherType is not None and dstMac is not None:
+    if data is not None and leng is not None and etherType is not None and dstMac is not None:
         trama += dstMac #Lo primero sera la direccion de destino de la Mac
         #print(macAddres)
         if macAddres is not None:
             trama.append(macAddress) #Lo segundo sera la direccion de ethernet de origen
 
-        trama.append(etherType)
-        trama.append(data)
+        trama += (etherType)
+        trama += (data)
         tamanyo_paquete = len(trama)
         if tamanyo_paquete < ETH_FRAME_MIN:
-            trama.append(bytearray(ETH_FRAME_MIN-tamanyo_paquete)) #Rellenaos con 0's hasta cumplir con el tamaño minimo requerido
+            trama += (bytearray(ETH_FRAME_MIN-tamanyo_paquete)) #Rellenamos con 0's hasta cumplir con el tamaño minimo requerido
         elif tamanyo_paquete > ETH_FRAME_MAX: #tamanyo de la trama mayor que ETHER_FRAME_MAX
             logging.error("Problema con el tamanyo de los datos especificados")
             return -1
