@@ -94,12 +94,6 @@ def processARPRequest(data,MAC):
         Retorno: Ninguno
     '''
     global myIP
-    header_limit = 8
-    senderEth_limit = 14
-    senderIP_limit = 18
-    targetEth_limit = 24
-    targetIP_limit = 28
-    goodeth_frame = 0
 
     senderEth = bytearray()
     senderIP = bytearray()
@@ -108,13 +102,13 @@ def processARPRequest(data,MAC):
 
     arp_reply = bytearray()                             #respuesta que vamos a enviar por el nivel de ethernet
 
-    senderEth = data[header_limit: senderEth_limit]     #MAC origen
+    senderEth = data[22: 28]     #MAC origen
     if senderEth != MAC:
         logging.error("La MAC de origen es la misma que la de la trama ARP enviada")
         return
-    senderIP = data[senderEth_limit: senderIP_limit]    #IP origen
-    targetEth = data[senderIP_limit: targetEth_limit]
-    targetIP = data[targetEth_limit: targetIP_limit]
+    senderIP = data[28: 32]    #IP origen
+    targetEth = data[32: 38]
+    targetIP = data[38: 42]
 
     if targetIP == myIP:                                #si esta ip es el destinatario del arp_request -> somos el equipo que contesta
         arp_reply = createARPReply(senderIP, senderEth)             #enviamos una respuesta con el MAC del que nos envia y su ip
@@ -165,13 +159,13 @@ def processARPReply(data,MAC):
 
     arp_reply = bytearray()                             #respuesta que vamos a enviar por el nivel de ethernet
 
-    senderEth = data[header_limit: senderEth_limit]     #MAC origen
+    senderEth = data[22: 28]     #MAC origen
     if senderEth != MAC:
         logging.error("La MAC de origen no es la misma que la de la trama ARP enviada")
         return
-    senderIP = data[senderEth_limit: senderIP_limit]    #IP origen
-    targetEth = data[senderIP_limit: targetEth_limit]
-    targetIP = data[targetEth_limit: targetIP_limit]
+    senderIP = data[28: 32]    #IP origen
+    targetEth = data[32: 38]
+    targetIP = data[38: 42]
 
     if targetIP == myIP:                                #si esta ip es el destinatario del arp_request -> somos el equipo que contesta
         if senderIP == requestedIP:                     #si nos esta contestando al que le hemos enviado request
@@ -260,12 +254,6 @@ def process_arp_frame(us,header,data,srcMac):
         Retorno: Ninguno
     '''
     #hw_type = 2 #los bytes que no cambian de una trama/ paquete de datos a otros
-    op_code_limit = 8
-    hw_type_ind = 2
-    type_proto_ind = 4
-    hw_size_ind = 5
-    proto_size_ind = 6
-    op_code_index = 8
 
     print(data)
     print(data[18:19])
