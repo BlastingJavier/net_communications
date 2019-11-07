@@ -100,7 +100,8 @@ def processARPRequest(data,MAC):
     targetEth = bytearray()
     targetIP = bytearray()
 
-    arp_reply = bytearray()                             #respuesta que vamos a enviar por el nivel de ethernet
+    arp_reply = bytearray()     #respuesta que vamos a enviar por el nivel de ethernet
+    goodeth_frame = 0                             
 
     senderEth = data[22: 28]     #MAC origen
     if senderEth != MAC:
@@ -143,14 +144,12 @@ def processARPReply(data,MAC):
         Retorno: Ninguno
     '''
     global requestedIP,resolvedMAC,awaitingResponse,cache
-    print("HOLAAAAA")
     header_limit = 8
     senderEth_limit = 14
     senderIP_limit = 18
     targetEth_limit = 24
     targetIP_limit = 28
     goodeth_frame = 0
-    print(data)
 
     senderEth = bytearray()
     senderIP = bytearray()
@@ -200,7 +199,7 @@ def createARPRequest(ip):
     targetEth = broadcastAddr   #enviamos a la direccion broadcast (para toda la subred)
     targetIP = ip               #ip direccion a resolver (del equipo del que queremos saber la MAC)
 
-    aux = [hw_type, protocol_type, hw_size, protocol_size, OpCode, senderEth, senderIP, targetEth, targetIP]
+    #aux = [hw_type, protocol_type, hw_size, protocol_size, OpCode, senderEth, senderIP, targetEth, targetIP]
     frame = b"".join([hw_type, protocol_type, hw_size, protocol_size, OpCode, senderEth, senderIP, targetEth, targetIP])
     #print(frame)
 
@@ -225,8 +224,6 @@ def createARPReply(IP,MAC):
     targetEth = MAC             #contestamos a la direccion MAC que nos ha enviado la peticion
     targetIP = IP            #ip direccion a la que contestar
 
-    aux = [hw_type, protocol_type, hw_size, protocol_size, OpCode, senderEth, senderIP, targetEth, targetIP]
-    aux2 = struct.pack('!H', aux)
     frame = b"".join([hw_type, protocol_type, hw_size, protocol_size, OpCode, senderEth, senderIP, targetEth, targetIP])
     
 
@@ -256,8 +253,6 @@ def process_arp_frame(us,header,data,srcMac):
     #hw_type = 2 #los bytes que no cambian de una trama/ paquete de datos a otros
 
     print(data)
-    print(data[18:19])
-    print(data[19:21])
 
     if data[14:16] == hw_type and data[16:18] == protocol_type and data[18:19] == hw_size and data[19:20] == protocol_size:
         logging.info("cabecera de ARP correcta -> 6 primeros bytes")
