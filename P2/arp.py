@@ -149,13 +149,14 @@ def processARPReply(data,MAC):
         Retorno: Ninguno
     '''
     global requestedIP,resolvedMAC,awaitingResponse,cache
-
+    print("HOLAAAAA")
     header_limit = 8
     senderEth_limit = 14
     senderIP_limit = 18
     targetEth_limit = 24
     targetIP_limit = 28
     goodeth_frame = 0
+    print(data)
 
     senderEth = bytearray()
     senderIP = bytearray()
@@ -166,7 +167,7 @@ def processARPReply(data,MAC):
 
     senderEth = data[header_limit: senderEth_limit]     #MAC origen
     if senderEth != MAC:
-        logging.error("La MAC de origen es la misma que la de la trama ARP enviada")
+        logging.error("La MAC de origen no es la misma que la de la trama ARP enviada")
         return
     senderIP = data[senderEth_limit: senderIP_limit]    #IP origen
     targetEth = data[senderIP_limit: targetEth_limit]
@@ -207,6 +208,7 @@ def createARPRequest(ip):
 
     aux = [hw_type, protocol_type, hw_size, protocol_size, OpCode, senderEth, senderIP, targetEth, targetIP]
     frame = b"".join([hw_type, protocol_type, hw_size, protocol_size, OpCode, senderEth, senderIP, targetEth, targetIP])
+    #print(frame)
 
     return frame
 
@@ -230,12 +232,9 @@ def createARPReply(IP,MAC):
     targetIP = IP            #ip direccion a la que contestar
 
     aux = [hw_type, protocol_type, hw_size, protocol_size, OpCode, senderEth, senderIP, targetEth, targetIP]
-    print("AQUII")
-    print(aux)
     aux2 = struct.pack('!H', aux)
-    print(aux2)
     frame = b"".join([hw_type, protocol_type, hw_size, protocol_size, OpCode, senderEth, senderIP, targetEth, targetIP])
-
+    
 
     #TODO implementar aqui
     return frame
@@ -260,25 +259,26 @@ def process_arp_frame(us,header,data,srcMac):
             -srcMac: MAC origen de la trama Ethernet que se ha recibido
         Retorno: Ninguno
     '''
-    type = 2 #los bytes que no cambian de una trama/ paquete de datos a otros
+    #hw_type = 2 #los bytes que no cambian de una trama/ paquete de datos a otros
     op_code_limit = 8
     hw_type_ind = 2
     type_proto_ind = 4
     hw_size_ind = 5
     proto_size_ind = 6
-
     op_code_index = 8
 
-    if data[:hw_type_ind] == hw_type and data[hw_type_index:type_proto_ind] == protocol_type \
-        and data[type_proto_ind:hw_size_ind] == hw_size and data[hwSize_index:proto_size_ind] == protocol_size:
+    print(data)
+    print(data[18:19])
+    print(data[19:21])
+
+    if data[14:16] == hw_type and data[16:18] == protocol_type and data[18:19] == hw_size and data[19:20] == protocol_size:
         logging.info("cabecera de ARP correcta -> 6 primeros bytes")
     else:
         logging.error("Cabecera erronea, trama incorrecta -> 6 primeros bytes")
 
-
-    if data[proto_size_ind:op_code_index] == b'\x00\x01':
+    if data[20:22] == b'\x00\x01':
         processARPRequest(data, srcMac)                     #request
-    elif data[proto_size_ind:op_code_index] == b'\x00\x02':
+    elif data[20:22] == b'\x00\x02':
         processARPReply(data, srcMac)                       #reply
     else:
         return
@@ -336,14 +336,14 @@ def ARPResolution(ip):
     '''
     global requestedIP,awaitingResponse,resolvedMAC
     arp_request = bytearray()
-    print(ip)
-    ip = struct.pack("!I", ip)
-    print(ip)
-
-    if ip in cache:
-        return cache[ip]
+    IP32Bit = struct.pack('!I', ip)
+    #IPQuad  = socket.inet_ntoa(IP32Bit)
+    #IPQuad_bytes = str.encode(IPQuad)
+    if IP32Bit in cache:
+        return cache[IP32Bit]
     else:
-        arp_request = createARPRequest(ip)
+        arp_request = createARPRequest(IP32Bit)
+        
         if sendEthernetFrame(arp_request,len(arp_request), b'\x08\x06', broadcastAddr) == -1:
             return None
 
@@ -353,6 +353,7 @@ def ARPResolution(ip):
         for i in range(3):
             sleep(0.05)
             if awaitingResponse == True:
-                sendEthernetFrame(arp_request,len(arp_request), b'\x08\x06', broadcastAddr)
+                ret = sendEthernetFrame(arp_request,len(arp_request), b'\x08\x06', broadcastAddr)
+                print(ret)
             else:
                 return resolvedMAC

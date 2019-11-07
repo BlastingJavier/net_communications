@@ -25,7 +25,7 @@ broadcastAddr = bytes([0xFF]*6)
 upperProtos = {}
 ethertype1 = b'\x08\x06'
 ethertype2 = b'\x08\x00'
-macAddres = None
+levelInitialized = False
 
 def getHwAddr(interface):
     '''
@@ -157,7 +157,6 @@ def registerCallback(callback_func, ethertype):
         upperProtos[ethertype1] = callback_func
     elif ethertype is not None and ethertype == ethertype2:
         upperProtos[ethertype2] = callback_func
-
     return
 
     #upperProtos es el diccionario que relaciona función de callback y ethertype
@@ -181,7 +180,9 @@ def startEthernetLevel(interface):
     global macAddress,handle,levelInitialized,recvThread
     handle = None
     errbuf = bytearray()
-    levelInitialized = False
+    if levelInitialized == True:
+        return -1
+    #levelInitialized = False
     #TODO: implementar aquí la inicialización de la interfaz y de las variables globales
     macAddress = getHwAddr(interface)
     handle = pcap_open_live(interface, ETH_FRAME_MAX, PROMISC, TO_MS, errbuf)
@@ -241,9 +242,8 @@ def sendEthernetFrame(data,leng,etherType,dstMac):
 
     if data is not None and leng is not None and etherType is not None and dstMac is not None:
         trama += dstMac #Lo primero sera la direccion de destino de la Mac
-        #print(macAddres)
-        if macAddres is not None:
-            trama.append(macAddress) #Lo segundo sera la direccion de ethernet de origen
+        if macAddress is not None:
+            trama += (macAddress) #Lo segundo sera la direccion de ethernet de origen
 
         trama += (etherType)
         trama += (data)
@@ -253,9 +253,10 @@ def sendEthernetFrame(data,leng,etherType,dstMac):
         elif tamanyo_paquete > ETH_FRAME_MAX: #tamanyo de la trama mayor que ETHER_FRAME_MAX
             logging.error("Problema con el tamanyo de los datos especificados")
             return -1
-
-    inject_handler = pcap_inject(handle, trama, tamanyo_paquete)
-    if inject_handler == tamanyo_paquete:
+    #print(trama)
+    ret_inject = 0
+    ret_inject = pcap_inject(handle, bytes(trama), tamanyo_paquete)
+    if ret_inject == tamanyo_paquete:
         return 0
     else:
         return -1
