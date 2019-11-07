@@ -67,23 +67,25 @@ def process_Ethernet_frame(us,header,data):
     destino_limit = 6
     origin_limit = 12
     ethertype_limit = 14
-    ethernet_destino = bytearray()
-    ethernet_origin = bytearray()
-    ethertype = bytearray()
 
-    ethernet_destino = data[:destino_limit]
-    ethernet_origin = data[destino_limit:origin_limit]
-    ethertype = data[origin_limit:ethertype_limit]
+    ethernet_destino = bytes(data[:destino_limit])
+    ethernet_origin = bytes(data[destino_limit:origin_limit])
+    ethertype = bytes(data[origin_limit:ethertype_limit])
 
     if ethernet_destino == broadcastAddr or ethernet_destino == macAddress:
+        """
         if ethertype1 == ethertype:
-            callback = upperProtos[ethertype1]
-            callback(us, header, data, ethernet_origin)
+            funcion_callback = upperProtos[ethertype1]
+            funcion_callback(us, header, data, ethernet_origin)
         elif ethertype2 == ethertype:
-            callback = upperProtos[ethertype2]
-            callback(us, header, data, ethernet_origin)
+            funcion_callback = upperProtos[ethertype2]
+            funcion_callback(us, header, data, ethernet_origin)
         else:
             return
+        """
+        funcion = upperProtos.get(ethertype)
+        if funcion:
+            funcion(us, header, data, ethernet_origin)
     else:
         return
 
@@ -253,7 +255,6 @@ def sendEthernetFrame(data,leng,etherType,dstMac):
         elif tamanyo_paquete > ETH_FRAME_MAX: #tamanyo de la trama mayor que ETHER_FRAME_MAX
             logging.error("Problema con el tamanyo de los datos especificados")
             return -1
-    #print(trama)
     ret_inject = 0
     ret_inject = pcap_inject(handle, bytes(trama), tamanyo_paquete)
     if ret_inject == tamanyo_paquete:
