@@ -14,7 +14,6 @@ def mycallback(us,h,data):
         user_callback (us,header,bytearray(data[:header.caplen]))
 
 
-
 pcap = ctypes.cdll.LoadLibrary("libpcap.so")
 
 

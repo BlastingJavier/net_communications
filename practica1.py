@@ -38,8 +38,7 @@ def procesa_paquete(us,header,data):
 	logging.info('Nuevo paquete de {} bytes capturado a las {}.{}'.format(header.len,header.ts.tv_sec,header.ts.tv_sec))
 	num_paquete += 1
 	print("Numero de paquete:", num_paquete)
-	#byte_list = []
-	#byte_list = list(struct.unpack('hhl', data))
+
 	strfinal='\0'
 
 	#Si el paquete es mas pequeño que el numero de bytes indicados en el argumento
@@ -113,10 +112,6 @@ if __name__ == "__main__":
 			print("Error abriendo la traza previamente capturada")
 			sys.exit(-1)
 
-	#TODO abrir la interfaz especificada para captura o la traza
-	#TODO abrir un dumper para volcar el tráfico (si se ha especificado interfaz) 
-	
-	
 	
 	ret = pcap_loop(handle,50,procesa_paquete,None)
 	if ret == -1:
