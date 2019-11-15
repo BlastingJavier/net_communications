@@ -17,6 +17,10 @@ IP_MIN_HLEN = 20
 IP_MAX_HLEN = 60
 #Valor de TTL por defecto
 DEFAULT_TTL = 64
+#Protocolos
+ICMP = b'\x01'
+TCP = b'\x06'
+UDP = b'\x11'
 
 def chksum(msg):
     '''
@@ -26,10 +30,10 @@ def chksum(msg):
             -msg: array de bytes con el contenido sobre el que se calculará el checksum
         Retorno: Entero de 16 bits con el resultado del checksum en ORDEN DE RED
     '''
-    s = 0       
+    s = 0
     for i in range(0, len(msg), 2):
         if (i+1) < len(msg):
-            a = msg[i] 
+            a = msg[i]
             b = msg[i+1]
             s = s + (a+(b << 8))
         elif (i+1)==len(msg):
@@ -52,15 +56,15 @@ def getMTU(interface):
     s = socket.socket(socket.AF_PACKET, socket.SOCK_RAW)
     ifr = struct.pack('16sH', interface.encode("utf-8"), 0)
     mtu = struct.unpack('16sH', ioctl(s,SIOCGIFMTU, ifr))[1]
-   
+
     s.close()
-   
+
     return mtu
-   
+
 def getNetmask(interface):
     '''
         Nombre: getNetmask
-        Descripción: Esta función obteiene la máscara de red asignada a una interfaz 
+        Descripción: Esta función obteiene la máscara de red asignada a una interfaz
         Argumentos:
             -interface: cadena con el nombre la interfaz sobre la que consultar la máscara
         Retorno: Entero de 32 bits con el valor de la máscara de red
@@ -109,9 +113,9 @@ def process_IP_datagram(us,header,data,srcMac):
                     -Protocolo
                 -Comprobar si tenemos registrada una función de callback de nivel superior consultando el diccionario protocols y usando como
                 clave el valor del campo protocolo del datagrama IP.
-                    -En caso de que haya una función de nivel superior registrada, debe llamarse a dicha funciñón 
+                    -En caso de que haya una función de nivel superior registrada, debe llamarse a dicha funciñón
                     pasando los datos (payload) contenidos en el datagrama IP.
-        
+
         Argumentos:
             -us: Datos de usuario pasados desde la llamada de pcap_loop. En nuestro caso será None
             -header: cabecera pcap_pktheader
@@ -120,6 +124,27 @@ def process_IP_datagram(us,header,data,srcMac):
         Retorno: Ninguno
     '''
 
+    if chksum(cabecera_ip) != 0:
+        return
+
+    if data[15:16] == 1 || data[16:29] != 0:
+        return
+
+
+    logging.debug(data[4:8]) #IHL (Longitud de cabecera)
+    logging.debug(data[11:13]) #IPID
+    logging.debug(data[14:15]) #DF
+    logging.debug(data[15:16]) #MF
+    logging.debug(data[16:29]) #Offset
+    logging.debug(data[33:37]) #IP origen
+    logging.debug(data[37:41]) #IP destino
+    logging.debug(data[30:31]) #Protocolo
+
+    if data[30:31] in protocols:
+        funcion = protocols[data[30:31]]
+        funcion(us,header,data,data[33:37])
+
+
 
 
 
@@ -127,14 +152,14 @@ def process_IP_datagram(us,header,data,srcMac):
 def registerIPProtocol(callback,protocol):
     '''
         Nombre: registerIPProtocol
-        Descripción: Esta función recibirá el nombre de una función y su valor de protocolo IP asociado y añadirá en la tabla 
-            (diccionario) de protocolos de nivel superior dicha asociación. 
-            Este mecanismo nos permite saber a qué función de nivel superior debemos llamar al recibir un datagrama IP  con un 
+        Descripción: Esta función recibirá el nombre de una función y su valor de protocolo IP asociado y añadirá en la tabla
+            (diccionario) de protocolos de nivel superior dicha asociación.
+            Este mecanismo nos permite saber a qué función de nivel superior debemos llamar al recibir un datagrama IP  con un
             determinado valor del campo protocolo (por ejemplo TCP o UDP).
-            Por ejemplo, podemos registrar una función llamada process_UDP_datagram asociada al valor de protocolo 17 y otra 
-            llamada process_ICMP_message asocaida al valor de protocolo 1. 
+            Por ejemplo, podemos registrar una función llamada process_UDP_datagram asociada al valor de protocolo 17 y otra
+            llamada process_ICMP_message asocaida al valor de protocolo 1.
         Argumentos:
-            -callback_fun: función de callback a ejecutar cuando se reciba el protocolo especificado. 
+            -callback_fun: función de callback a ejecutar cuando se reciba el protocolo especificado.
                 La función que se pase como argumento debe tener el siguiente prototipo: funcion(us,header,data,srcIp):
                 Dónde:
                     -us: son los datos de usuarios pasados por pcap_loop (en nuestro caso este valor será siempre None)
@@ -143,8 +168,17 @@ def registerIPProtocol(callback,protocol):
                     -srcIP: dirección IP que ha enviado el datagrama actual.
                 La función no retornará nada. Si un datagrama se quiere descartar basta con hacer un return sin valor y dejará de procesarse.
             -protocol: valor del campo protocolo de IP para el cuál se quiere registrar una función de callback.
-        Retorno: Ninguno 
+        Retorno: Ninguno
     '''
+
+    if protocol is not None and callback is not None and protocol == ICMP: #----PREGUNTAR-------ICMP-> ENTERO O BYTES
+        protocols[protocol] = callback
+    elif protocol is not None and callback is not None and protocol == TCP:
+        protocols[protocol] = callback
+    elif protocol is not None and callback is not None and protocol == UDP:
+        protocols[protocol] = callback
+    else:
+        return
 
 def initIP(interface,opts=None):
     global myIP, MTU, netmask, defaultGW,ipOpts
@@ -167,10 +201,12 @@ def initIP(interface,opts=None):
     if initARP(interface) == False:
         return False
     myIP = getIP(interface)
-    #myIP = myIP.to_bytes(4, byteorder='big')
+    myIP = myIP.to_bytes(4, byteorder='big')
     MTU = getMTU(interface)
     netmask = getNetmask(interface)
+    netmask = netmask.to_bytes(4, byteorder='big')
     defaultGW = getDefaultGW(interface)
+    defaultGW = defaultGW.to_bytes(4, byteorder='big')
     ipOpts = opts
     registerCallback(process_IP_datagram, b'\x08\x00')
     if myIP is None || MTU is None || netmask is None || defaultGW is None:
@@ -179,7 +215,7 @@ def initIP(interface,opts=None):
 
 
 def sendIPDatagram(dstIP,data,protocol):
-    global IPID
+    global IPID, ipOpts, netmask, myIP
     '''
         Nombre: sendIPDatagram
         Descripción: Esta función construye un datagrama IP y lo envía. En caso de que los datos a enviar sean muy grandes la función
@@ -200,14 +236,17 @@ def sendIPDatagram(dstIP,data,protocol):
             -Para cada datagrama (no fragmento):
                 -Incrementar la variable IPID en 1.
         Argumentos:
-            -dstIP: entero de 32 bits con la IP destino del datagrama 
+            -dstIP: entero de 32 bits con la IP destino del datagrama
             -data: array de bytes con los datos a incluir como payload en el datagrama
             -protocol: valor numérico del campo IP protocolo que indica el protocolo de nivel superior de los datos
             contenidos en el payload. Por ejemplo 1, 6 o 17.
         Retorno: True o False en función de si se ha enviado el datagrama correctamente o no
-          
+
     '''
     header = bytes()
-
-
-
+    #Añadir al header constantes (rellenar cabcecera) y al final el data
+    #cabecera_ip += data[] Ver opciones ------------PREGUNTAR--------------
+    if data[9:11] <= MTU:
+        if (data[37:41] & netmask) == (myIP & netmask)
+        sendEthernetFrame(data,leng,etherType,dstMac)
+    else:
