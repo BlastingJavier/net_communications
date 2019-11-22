@@ -2,6 +2,7 @@ from ethernet import *
 from arp import *
 from fcntl import ioctl
 import subprocess
+from bitstring import BitArray
 SIOCGIFMTU = 0x8921
 SIOCGIFNETMASK = 0x891b
 #Diccionario de protocolos. Las claves con los valores numéricos de protocolos de nivel superior a IP
@@ -246,17 +247,31 @@ def sendIPDatagram(dstIP,data,protocol):
     longitud_opciones = 0
     if(ipOpts != None):
         longitud_opciones = len(ipOpts)
-    header = bytes()
-    header += b'0100'
-    tam_header = 22 + longitud_opciones #Preguntar
-    header += b'10110' #Redondeamos el tamaño de la cabecera IP a 22 (21 bytes + 3 bits)
-    header += b'\x00' #Type of service
-    header += bytes([tam_header+longitud_opciones+len(data)]) #Longitud total del datagrama
-    header += bytes([IPID])
-    IPID++;
-    #Añadir al header constantes (rellenar cabececera) y al final el data
-    #cabecera_ip += data[] Ver opciones 
-    if data[9:11] <= MTU:
-        if (data[37:41] & netmask) == (myIP & netmask)
-        sendEthernetFrame(data,leng,etherType,dstMac)
+    if len(data)+longitud_opciones+20 <= MTU:
+        header = bytes()
+        tam_header = bytearray()
+        header += b'\x4' #Version
+        tam_header = 20 + longitud_opciones
+        tam_header = tam_header/4
+        tam_header = tam_header.to_bytes(1, byteorder='big')
+        header_binary = BitArray(hex=tam_header)[4:]
+        header += header_binary
+        header += b'\x00' #Type of service
+        header += bytes([20+longitud_opciones+len(data)]) #Longitud total del datagrama
+        header += bytes([IPID])
+        IPID++
+        header += b'\x00\x00'
+        header += b'\x40'
+        header += protocol.to_bytes(1, byteorder='big')
+        header += b'\x00\x00'
+        header += myIP
+        header += dstIP.to_bytes(4, byteorder='big')
+        if(ipOpts != None):
+            header += ipOpts
+        checksum = chksum(header)
+        header[11:13] = struct.pack('!H',checksum)
+        header += data
+        if (dstIP.to_bytes(4, byteorder='big') & netmask) == (myIP & netmask)
+            mac = ARPResolution(dstIP)
+            sendEthernetFrame(header,len(header),b'\x08\x00',mac)
     else:
