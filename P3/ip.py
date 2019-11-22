@@ -124,7 +124,7 @@ def process_IP_datagram(us,header,data,srcMac):
         Retorno: Ninguno
     '''
 
-    if chksum(cabecera_ip) != 0:
+    if chksum(data) != 0:
         return
 
     if data[15:16] == 1 || data[16:29] != 0:
@@ -171,7 +171,7 @@ def registerIPProtocol(callback,protocol):
         Retorno: Ninguno
     '''
 
-    if protocol is not None and callback is not None and protocol == ICMP: #----PREGUNTAR-------ICMP-> ENTERO O BYTES
+    if protocol is not None and callback is not None and protocol == ICMP:
         protocols[protocol] = callback
     elif protocol is not None and callback is not None and protocol == TCP:
         protocols[protocol] = callback

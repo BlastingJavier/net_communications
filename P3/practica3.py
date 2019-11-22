@@ -64,14 +64,13 @@ if __name__ == "__main__":
 			#Pasamos los datos de cadena a bytes
 			data = data.encode()
 	
-	initICMP()
-	initUDP()
-	if initIP(args.interface,ipOpts) == False:
-		logging.error('Inicializando nivel IP')
-		sys.exit(-1)
-
 	startEthernetLevel(args.interface)
-	
+    initICMP()
+    initUDP()
+    if initIP(args.interface,ipOpts) == False:
+        logging.error('Inicializando nivel IP')
+        sys.exit(-1)
+        
 	
 	while True:
 		try:
