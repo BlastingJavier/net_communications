@@ -243,9 +243,19 @@ def sendIPDatagram(dstIP,data,protocol):
         Retorno: True o False en función de si se ha enviado el datagrama correctamente o no
 
     '''
+    longitud_opciones = 0
+    if(ipOpts != None):
+        longitud_opciones = len(ipOpts)
     header = bytes()
-    #Añadir al header constantes (rellenar cabcecera) y al final el data
-    #cabecera_ip += data[] Ver opciones ------------PREGUNTAR--------------
+    header += b'0100'
+    tam_header = 22 + longitud_opciones #Preguntar
+    header += b'10110' #Redondeamos el tamaño de la cabecera IP a 22 (21 bytes + 3 bits)
+    header += b'\x00' #Type of service
+    header += bytes([tam_header+longitud_opciones+len(data)]) #Longitud total del datagrama
+    header += bytes([IPID])
+    IPID++;
+    #Añadir al header constantes (rellenar cabececera) y al final el data
+    #cabecera_ip += data[] Ver opciones 
     if data[9:11] <= MTU:
         if (data[37:41] & netmask) == (myIP & netmask)
         sendEthernetFrame(data,leng,etherType,dstMac)
