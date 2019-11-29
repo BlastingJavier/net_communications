@@ -1,5 +1,6 @@
-from ip import *
+import ip
 import struct
+import logging
 
 UDP_HLEN = 8
 UDP_PROTO = 17
@@ -38,8 +39,14 @@ def process_UDP_datagram(us,header,data,srcIP):
             -data: array de bytes con el conenido del datagrama UDP
             -srcIP: dirección IP que ha enviado el datagrama actual.
         Retorno: Ninguno
-          
+
     '''
+
+    logging.debug(data[0:2])            #puerto origen
+    logging.debug(data[2:4])            #puerto destino
+    logging.debug(data[10:])            #datos contenidos
+
+    
 
 
 def sendUDPDatagram(data,dstPort,dstIP):
@@ -60,9 +67,18 @@ def sendUDPDatagram(data,dstPort,dstIP):
         Retorno: True o False en función de si se ha enviado el datagrama correctamente o no
           
     '''
-    datagram = bytes()
+    datagrama = bytes()
+    cabecera = bytes()
 
+    cabecera += getUDPSourcePort().to_bytes(2, byteorder='big')             #source
+    cabecera += dstPort.to_bytes(2, byteorder='big')                        #dst
+    cabecera += (len(cabecera) + len(data)).to_bytes(2, byteorder='big')    #leg
+    cabecera += b'\x00\x00'                                                 #checksum -> lo pondremos siempre a 0
 
+    datagrama += cabecera
+    datagrama += data
+
+    ip.sendIPDatagram(dstIP, datagrama, UDP_PROTO)
 def initUDP():
     '''
         Nombre: initUDP
@@ -75,3 +91,4 @@ def initUDP():
         Retorno: Ninguno
           
     '''
+    ip.registerIPProtocol(process_UDP_datagram, UDP_PROTO)
