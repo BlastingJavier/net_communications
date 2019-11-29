@@ -3,6 +3,7 @@ from arp import *
 from fcntl import ioctl
 import subprocess
 from bitstring import BitArray
+import math
 SIOCGIFMTU = 0x8921
 SIOCGIFNETMASK = 0x891b
 #Diccionario de protocolos. Las claves con los valores numéricos de protocolos de nivel superior a IP
@@ -216,7 +217,7 @@ def initIP(interface,opts=None):
 
 
 def sendIPDatagram(dstIP,data,protocol):
-    global IPID, ipOpts, netmask, myIP
+    global IPID, ipOpts, netmask, myIP, defaultGW
     '''
         Nombre: sendIPDatagram
         Descripción: Esta función construye un datagrama IP y lo envía. En caso de que los datos a enviar sean muy grandes la función
@@ -247,23 +248,24 @@ def sendIPDatagram(dstIP,data,protocol):
     longitud_opciones = 0
     if(ipOpts != None):
         longitud_opciones = len(ipOpts)
-    if len(data)+longitud_opciones+20 <= MTU:
-        header = bytes()
-        tam_header = bytearray()
-        header += b'\x4' #Version
-        tam_header = 20 + longitud_opciones
-        tam_header = tam_header/4
-        tam_header = tam_header.to_bytes(1, byteorder='big')
-        header_binary = BitArray(hex=tam_header)[4:]
-        header += header_binary
-        header += b'\x00' #Type of service
-        header += bytes([20+longitud_opciones+len(data)]) #Longitud total del datagrama
-        header += bytes([IPID])
-        IPID++
-        header += b'\x00\x00'
-        header += b'\x40'
+
+    header = bytes()
+    tam_header = bytearray()
+    header += b'\x4' #Version
+    tam_header = 20 + longitud_opciones
+    tam_header = tam_header/4
+    tam_header = tam_header.to_bytes(1, byteorder='big')
+    header_binary = BitArray(hex=tam_header)[4:]
+    header += header_binary
+    header += b'\x00' #Type of service
+    header += bytes([20+longitud_opciones+len(data)]) #Longitud total del datagrama
+    header += bytes([IPID])
+
+    if len(data)+longitud_opciones+20 <= MTU: #enviamos paquete completo
+        header += b'\x00\x00' #Flags + offset
+        header += b'\x40' #Time to live
         header += protocol.to_bytes(1, byteorder='big')
-        header += b'\x00\x00'
+        header += b'\x00\x00' #Por defecto 0
         header += myIP
         header += dstIP.to_bytes(4, byteorder='big')
         if(ipOpts != None):
@@ -271,7 +273,39 @@ def sendIPDatagram(dstIP,data,protocol):
         checksum = chksum(header)
         header[11:13] = struct.pack('!H',checksum)
         header += data
-        if (dstIP.to_bytes(4, byteorder='big') & netmask) == (myIP & netmask)
-            mac = ARPResolution(dstIP)
-            sendEthernetFrame(header,len(header),b'\x08\x00',mac)
+    else: #aqui fragmentamos
+        tam_max_fragmento = MTU - 20 - longitud_opciones
+        if len(header) % 8 == 0:
+            num_fragmento = math.ceil(len(header)/tam_max_fragmento)
+        else:
+            num_fragmento = math.floor(len(header)/tam_max_fragmento)
+
+        offset = 0
+        for i in range(num_fragmento):
+            header += b'\x00\x00' #Flags + offset
+            header += b'\x40' #Time to live
+            header += protocol.to_bytes(1, byteorder='big')
+            header += b'\x00\x00' #Por defecto 0
+            header += myIP
+            header += dstIP.to_bytes(4, byteorder='big')
+            if i == 0:
+                header[6:7] = (header[6:7] | b'\x20')
+                header[7:8] = (header[7:8] | b'\x00')
+            elif i == num_fragmento-1:
+                offset += tam_max_fragmento/8
+                header[6:8] = (b'\x00' << 8 | offset.to_bytes(2, byteorder='big'))
+            else:
+                offset += tam_max_fragmento/8
+                tam_max_fragmento = tam_max_fragmento + tam_max_fragmento
+                header[6:8] = (b'\x20' << 8 | offset.to_bytes(2, byteorder='big'))
+
+    if (dstIP.to_bytes(4, byteorder='big') & netmask) == (myIP & netmask)
+        mac = ARPResolution(dstIP)
+        if sendEthernetFrame(header,len(header),b'\x08\x00',mac) == -1:
+            return False
     else:
+        mac = ARPResolution(defaultGW)
+        if sendEthernetFrame(header,len(header),b'\x08\x00',mac) == -1:
+            return False
+    IPID++
+    return True

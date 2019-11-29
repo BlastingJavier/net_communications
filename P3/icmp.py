@@ -57,19 +57,19 @@ def process_ICMP_message(us,header,data,srcIp):
             -data: array de bytes con el conenido del mensaje ICMP
             -srcIP: dirección IP que ha enviado el datagrama actual.
         Retorno: Ninguno
-          
+
     '''
     global icmp_send_times
     if icmp_chksum(data) != 0:
         logging.error('chechsum icmp incorrecto')
         return
-    
+
     logging.debug(data[:1])         #debug tipo codigo
     logging.debug(data[1:2])        #debug valor
-    
+
     if data[:1] == ICMP_ECHO_REQUEST_TYPE:
         #devolvemos el mensaje ahora reply con tipo reqply, codigo del reply id el que nos envian y seqnum tambien el que nos envian
-        sendICMPMessage(data, ICMP_ECHO_REPLY_TYPE, b'\x00', data[4:6], data[6:8], srcIp)
+        sendICMPMessage(data, ICMP_ECHO_REPLY_TYPE, b'\x00', struct.unpack('!I',data[4:6])[0], struct.unpack('!I',data[6:8])[0], srcIp)
     elif data[:1] == ICMP_ECHO_REPLY_TYPE:
         dstIp = srcIP
         icmp_id = data[4:5]
@@ -96,19 +96,19 @@ def sendICMPMessage(data,type,code,icmp_id,icmp_seqnum,dstIP):
                     -Se debe proteger al acceso al diccionario usando la variable timeLock
 
                 -Llamar a sendIPDatagram para enviar el mensaje ICMP
-                
+
             -Si no:
                 -Tipo no soportado. Se devuelve False
 
         Argumentos:
             -data: array de bytes con los datos a incluir como payload en el mensaje ICMP
             -type: valor del campo tipo de ICMP
-            -code: valor del campo code de ICMP 
+            -code: valor del campo code de ICMP
             -icmp_id: entero que contiene el valor del campo ID de ICMP a enviar
             -icmp_seqnum: entero que contiene el valor del campo Seqnum de ICMP a enviar
             -dstIP: entero de 32 bits con la IP destino del mensaje ICMP
         Retorno: True o False en función de si se ha enviado el mensaje correctamente o no
-          
+
     '''
     global icmp_send_times
 
@@ -134,9 +134,9 @@ def sendICMPMessage(data,type,code,icmp_id,icmp_seqnum,dstIP):
 
     else:
         return False
-  
+
     message = bytes()
-   
+
 def initICMP():
     '''
         Nombre: initICMP
@@ -147,7 +147,7 @@ def initICMP():
         Argumentos:
             -Ninguno
         Retorno: Ninguno
-          
+
     '''
     ip.registerIPProtocol(process_ICMP_message, b'\x01')
     return
