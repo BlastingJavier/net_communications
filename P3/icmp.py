@@ -1,6 +1,7 @@
-from ip import *
+import ip
 from threading import Lock
 import struct
+import logging
 
 ICMP_PROTO = 1
 
@@ -10,6 +11,23 @@ ICMP_ECHO_REPLY_TYPE = 0
 
 timeLock = Lock()
 icmp_send_times = {}
+
+
+def icmp_chksum(msg):
+    s = 0
+    for i in range(0, len(msg), 2):
+        if (i+1) < len(msg):
+            a = msg[i]
+            b = msg[i+1]
+            s = s + (a+(b << 8))
+        elif (i+1)==len(msg):
+            s += msg[i]
+        else:
+            raise 'Error calculando el checksum'
+    s = s + (s >> 16)
+    s = ~s & 0xffff
+
+    return s
 
 def process_ICMP_message(us,header,data,srcIp):
     '''
@@ -41,7 +59,27 @@ def process_ICMP_message(us,header,data,srcIp):
         Retorno: Ninguno
           
     '''
+    global icmp_send_times
+    if icmp_chksum(data) != 0:
+        logging.error('chechsum icmp incorrecto')
+        return
     
+    logging.debug(data[:1])         #debug tipo codigo
+    logging.debug(data[1:2])        #debug valor
+    
+    if data[:1] == ICMP_ECHO_REQUEST_TYPE:
+        #devolvemos el mensaje ahora reply con tipo reqply, codigo del reply id el que nos envian y seqnum tambien el que nos envian
+        sendICMPMessage(data, ICMP_ECHO_REPLY_TYPE, b'\x00', data[4:6], data[6:8], srcIp)
+    elif data[:1] == ICMP_ECHO_REPLY_TYPE:
+        dstIp = srcIP
+        icmp_id = data[4:5]
+        icmp_seqnum = data[6:8]
+        with timeLock:
+            rtt = icmp_send_times[dstIp+icmp_id+icmp_seqnum]
+            rtt = header.ts.tv_sec - rtt                    #recepcion - tenvio es el tiempo total del paquete hasta haber llegado
+            print("RTT:{}".format(rtt))
+    else:
+        return
 
 def sendICMPMessage(data,type,code,icmp_id,icmp_seqnum,dstIP):
     '''
@@ -72,6 +110,30 @@ def sendICMPMessage(data,type,code,icmp_id,icmp_seqnum,dstIP):
         Retorno: True o False en función de si se ha enviado el mensaje correctamente o no
           
     '''
+    global icmp_send_times
+
+    cabecera = bytes()
+    mensaje = bytes()
+    if type == ICMP_ECHO_REQUEST_TYPE or type == ICMP_ECHO_REPLY_TYPE:
+        cabecera += type        #tipo de mensaje ICMP
+        cabecera += code       #code del icmp
+        cabecera += b'\x00\x00' #rellenamos checksum con ceros por ahora para calcularlo
+        cabecera += icmp_id.to_bytes(2, byteorder='big')
+        cabecera += icmp_seqnum.to_bytes(2, byteorder='big')
+
+        #calculamos ahora el checksum
+        mensaje += cabecera
+        mensaje += data
+        mensaje[3:4] = icmp_chksum(mensaje)     #ojo el checksum se hace sobre cabecera + datos
+
+        if type == ICMP_ECHO_REQUEST_TYPE:
+            with timeLock:
+                icmp_send_times[dstIp+icmp_id+icmp_seqnum] = time.time()
+
+        ip.sendIPDatagram(dstIp, mensaje, ICMP_PROTO)           #ojo esto es un enteor
+
+    else:
+        return False
   
     message = bytes()
    
@@ -87,3 +149,5 @@ def initICMP():
         Retorno: Ninguno
           
     '''
+    ip.registerIPProtocol(process_ICMP_message, b'\x01')
+    return
