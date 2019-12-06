@@ -129,7 +129,7 @@ def process_IP_datagram(us,header,data,srcMac):
     if chksum(data) != 0:
         return
 
-    if data[15:16] == 1 || data[16:29] != 0:
+    if data[15:16] == 1 or data[16:29] != 0:
         return
 
 
@@ -211,7 +211,7 @@ def initIP(interface,opts=None):
     defaultGW = defaultGW.to_bytes(4, byteorder='big')
     ipOpts = opts
     registerCallback(process_IP_datagram, b'\x08\x00')
-    if myIP is None || MTU is None || netmask is None || defaultGW is None:
+    if myIP is None or MTU is None or netmask is None or defaultGW is None:
         return False
     return True
 
@@ -250,11 +250,20 @@ def sendIPDatagram(dstIP,data,protocol):
         longitud_opciones = len(ipOpts)
 
     header = bytes()
+    #primer_byte = bytes()
+
     tam_header = bytearray()
-    header += b'\x4' #Version
+    #header += b'\x00'
+    primer_byte = "{0:b}".format(4) #Version
+    primer_byte = "0" + primer_byte
     tam_header = 20 + longitud_opciones
     tam_header = tam_header/4
-    tam_header = tam_header.to_bytes(1, byteorder='big')
+    primer_byte += "{0:b}".format(tam_header)
+    if len(primer_byte) < 8:
+        primer_byte = primer_byte + "0"
+
+    header[0:1] = getbytes(primer_byte)
+    
     header_binary = BitArray(hex=tam_header)[4:]
     header += header_binary
     header += b'\x00' #Type of service
@@ -273,12 +282,29 @@ def sendIPDatagram(dstIP,data,protocol):
         checksum = chksum(header)
         header[11:13] = struct.pack('!H',checksum)
         header += data
+
+        #Enviamos el datagrama
+        if (dstIP.to_bytes(4, byteorder='big') & netmask) == (myIP & netmask):
+            mac = ARPResolution(dstIP)
+            if sendEthernetFrame(header,len(header),b'\x08\x00',mac) == -1:
+                return False
+        else:
+            mac = ARPResolution(defaultGW)
+            if sendEthernetFrame(header,len(header),b'\x08\x00',mac) == -1:
+                return False
+        IPID+=1
     else: #aqui fragmentamos
         tam_max_fragmento = MTU - 20 - longitud_opciones
-        if len(header) % 8 == 0:
+        aux = tam_max_fragmento
+        while(aux % 8 != 0):
+            aux-=1
+
+        tam_max_fragmento = aux
+
+        num_fragmento = len(data)/tam_max_fragmento
+
+        if len(data) % tam_max_fragmento != 0:
             num_fragmento = math.ceil(len(header)/tam_max_fragmento)
-        else:
-            num_fragmento = math.floor(len(header)/tam_max_fragmento)
 
         offset = 0
         for i in range(num_fragmento):
@@ -288,24 +314,60 @@ def sendIPDatagram(dstIP,data,protocol):
             header += b'\x00\x00' #Por defecto 0
             header += myIP
             header += dstIP.to_bytes(4, byteorder='big')
+            if(ipOpts != None):
+                header += ipOpts
+            #Enviamos el primer fragmento
             if i == 0:
                 header[6:7] = (header[6:7] | b'\x20')
                 header[7:8] = (header[7:8] | b'\x00')
+                if (dstIP.to_bytes(4, byteorder='big') & netmask) == (myIP & netmask):
+                    mac = ARPResolution(dstIP)
+                    if sendEthernetFrame(header,len(header),b'\x08\x00',mac) == -1:
+                        return False
+                else:
+                    mac = ARPResolution(defaultGW)
+                    if sendEthernetFrame(header,len(header),b'\x08\x00',mac) == -1:
+                        return False
+                IPID+=1
+            #Enviamos el ultimo fragmento
             elif i == num_fragmento-1:
-                offset += tam_max_fragmento/8
+                offset += tam_max_fragmento / 8
                 header[6:8] = (b'\x00' << 8 | offset.to_bytes(2, byteorder='big'))
+                if (dstIP.to_bytes(4, byteorder='big') & netmask) == (myIP & netmask):
+                    mac = ARPResolution(dstIP)
+                    if sendEthernetFrame(header,len(header),b'\x08\x00',mac) == -1:
+                        return False
+                else:
+                    mac = ARPResolution(defaultGW)
+                    if sendEthernetFrame(header,len(header),b'\x08\x00',mac) == -1:
+                        return False
+                IPID+=1
+            #Enviamos el resto de fragmentos
             else:
                 offset += tam_max_fragmento/8
                 tam_max_fragmento = tam_max_fragmento + tam_max_fragmento
                 header[6:8] = (b'\x20' << 8 | offset.to_bytes(2, byteorder='big'))
-
-    if (dstIP.to_bytes(4, byteorder='big') & netmask) == (myIP & netmask)
-        mac = ARPResolution(dstIP)
-        if sendEthernetFrame(header,len(header),b'\x08\x00',mac) == -1:
-            return False
-    else:
-        mac = ARPResolution(defaultGW)
-        if sendEthernetFrame(header,len(header),b'\x08\x00',mac) == -1:
-            return False
-    IPID++
+                if (dstIP.to_bytes(4, byteorder='big') & netmask) == (myIP & netmask):
+                    mac = ARPResolution(dstIP)
+                    if sendEthernetFrame(header,len(header),b'\x08\x00',mac) == -1:
+                        return False
+                else:
+                    mac = ARPResolution(defaultGW)
+                    if sendEthernetFrame(header,len(header),b'\x08\x00',mac) == -1:
+                        return False
+                IPID+=1
     return True
+
+#Funcion complementaria para transformar bits a bytes
+def getbytes(bits):
+    done = False
+    while not done:
+        byte = 0
+        for _ in range(0, 8):
+            try:
+                bit = next(bits)
+            except StopIteration:
+                bit = 0
+                done = True
+            byte = (byte << 1) | bit
+        yield byte

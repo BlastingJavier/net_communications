@@ -4,9 +4,6 @@
     Autor: Javier Ramos <javier.ramos@uam.es>
     2019 EPS-UAM
 '''
-
-
-
 from ethernet import *
 import logging
 import socket
