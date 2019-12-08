@@ -20,9 +20,10 @@ IP_MAX_HLEN = 60
 #Valor de TTL por defecto
 DEFAULT_TTL = 64
 #Protocolos
-ICMP = b'\x01'
-TCP = b'\x06'
-UDP = b'\x11'
+ICMP = 1
+TCP = 6
+UDP = 17
+
 
 def chksum(msg):
     '''
@@ -172,7 +173,7 @@ def registerIPProtocol(callback,protocol):
             -protocol: valor del campo protocolo de IP para el cuál se quiere registrar una función de callback.
         Retorno: Ninguno
     '''
-
+    global protocols
     if protocol is not None and callback is not None and protocol == ICMP:
         protocols[protocol] = callback
     elif protocol is not None and callback is not None and protocol == TCP:
@@ -200,6 +201,8 @@ def initIP(interface,opts=None):
             -opts: array de bytes con las opciones a nivel IP a incluir en los datagramas o None si no hay opciones a añadir
         Retorno: True o False en función de si se ha inicializado el nivel o no
     '''
+    import pdb
+    pdb.set_trace()
     if initARP(interface) == False:
         return False
     myIP = getIP(interface)

@@ -162,8 +162,6 @@ def registerCallback(callback_func, ethertype):
     return
 
     #upperProtos es el diccionario que relaciona función de callback y ethertype
-
-
 def startEthernetLevel(interface):
     '''
     1-------->

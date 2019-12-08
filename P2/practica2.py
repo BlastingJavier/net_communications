@@ -17,6 +17,8 @@ import time
 import logging
 import socket
 
+import pdb
+
 
 
 
@@ -40,7 +42,7 @@ if __name__ == "__main__":
         sys.exit(-1)
 
     
-    
+    #pdb.set_trace()
     #Inicializamos el nivel Ethernet en la interfaz especificada
     if (startEthernetLevel(args.interface) != 0):
         logging.error('Ethernet no inicializado')

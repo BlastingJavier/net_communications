@@ -9,6 +9,11 @@
 
 from udp import *
 from icmp import *
+from ethernet import *
+from ip import *
+
+import pdb
+
 import sys
 import binascii
 import signal
@@ -24,6 +29,7 @@ ICMP_ECHO_REQUEST_TYPE = 8
 ICMP_ECHO_REQUEST_CODE = 0
 
 ipTstampOption =    bytes([68,12,13,0x01,10,0,0,3])
+
 
 if __name__ == "__main__":
     ICMP_ID = 0
@@ -64,9 +70,13 @@ if __name__ == "__main__":
             #Pasamos los datos de cadena a bytes
             data = data.encode()
     
-    startEthernetLevel(args.interface)
+    if (startEthernetLevel(args.interface) != 0):
+        logging.error('Ethernet no inicializado')
+        sys.exit(-1)
+    
     initICMP()
     initUDP()
+
     if initIP(args.interface,ipOpts) == False:
         logging.error('Inicializando nivel IP')
         sys.exit(-1)

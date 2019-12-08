@@ -149,5 +149,5 @@ def initICMP():
         Retorno: Ninguno
 
     '''
-    ip.registerIPProtocol(process_ICMP_message, b'\x01')
-    return
+    #el valor de ICMP_PROTO ES 1
+    ip.registerIPProtocol(process_ICMP_message, ICMP_PROTO)

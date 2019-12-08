@@ -91,4 +91,5 @@ def initUDP():
         Retorno: Ninguno
           
     '''
+    #el valor de ICMP_PROTO ES 1
     ip.registerIPProtocol(process_UDP_datagram, UDP_PROTO)

@@ -13,6 +13,7 @@ import time
 from threading import Lock
 from expiringdict import ExpiringDict
 from time import sleep
+import pdb
 
 #Semáforo global
 globalLock =Lock()
