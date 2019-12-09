@@ -2,7 +2,6 @@ from ethernet import *
 from arp import *
 from fcntl import ioctl
 import subprocess
-from bitstring import BitArray
 import math
 SIOCGIFMTU = 0x8921
 SIOCGIFNETMASK = 0x891b
@@ -267,8 +266,6 @@ def sendIPDatagram(dstIP,data,protocol):
 
     header[0:1] = getbytes(primer_byte)
     
-    header_binary = BitArray(hex=tam_header)[4:]
-    header += header_binary
     header += b'\x00' #Type of service
     header += bytes([20+longitud_opciones+len(data)]) #Longitud total del datagrama
     header += bytes([IPID])
