@@ -125,26 +125,39 @@ def process_IP_datagram(us,header,data,srcMac):
             -srcMac: MAC origen de la trama Ethernet que se ha recibido
         Retorno: Ninguno
     '''
+    """
+    print("AQUI",data[14:18])IHL
+    print(data[18:19]) type of service
+    print(data[19:21]) total length
+    print(data[21:23]) IPID
+    print(data[23:25]) Offset y flags
+    print(data[25:26]) time to live
+    print(data[26:27]) protocolo
+    print(data[27:29]) header cheksum
+    print(data[29:33]) ip origen
+    print(data[33:37]) ip destino"""
 
-    if chksum(data) != 0:
+    if chksum(data[14:37]) != 0:
+        print("error cheksum\n")
         return
 
-    if data[15:16] == 1 or data[16:29] != 0:
+
+
+    if data[23:25] == '0x0000':
+        print("No reensamblar")
         return
 
 
-    logging.debug(data[4:8]) #IHL (Longitud de cabecera)
-    logging.debug(data[11:13]) #IPID
-    logging.debug(data[14:15]) #DF
-    logging.debug(data[15:16]) #MF
-    logging.debug(data[16:29]) #Offset
-    logging.debug(data[33:37]) #IP origen
-    logging.debug(data[37:41]) #IP destino
-    logging.debug(data[30:31]) #Protocolo
+    logging.debug(data[14:18]) #IHL (Longitud de cabecera)
+    logging.debug(data[21:23]) #IPID
+    logging.debug(data[23:25]) #DF, MF y offset
+    logging.debug(data[29:33]) #IP origen
+    logging.debug(data[33:37]) #IP destino
+    logging.debug(data[26:27]) #Protocolo
 
-    if data[30:31] in protocols:
-        funcion = protocols[data[30:31]]
-        funcion(us,header,data,data[33:37])
+    if bytes(data[26:27]) in protocols:
+        funcion = protocols[data[26:27]]
+        funcion(us,header,data,data[14:37])
 
 
 
@@ -292,13 +305,18 @@ def sendIPDatagram(dstIP,data,protocol):
 
         header_final += bytes(hex(dato),encoding='utf8') #Version e IHL
         header_final += b'\x00' #Type of service
-        header_final += bytes([20+longitud_opciones+len(data)]) #Longitud total del datagrama
-        header_final += bytes([IPID]) #Identificador
+        tamanio_datagrama = 20+longitud_opciones+len(data)
+        print("Tamanio datagrama", tamanio_datagrama.to_bytes(2, byteorder='big'))
+        header_final += tamanio_datagrama.to_bytes(2, byteorder='big') #Longitud total del datagrama
+        print("IPID", IPID.to_bytes(2, byteorder='big'))
+        header_final += IPID.to_bytes(2, byteorder='big') #Identificador
         header_final += b'\x00\x00' #Flags + offset
         header_final += b'\x40' #Time to live
+        print("protocolo", protocol.to_bytes(1, byteorder='big'))
         header_final += protocol.to_bytes(1, byteorder='big') #protocolo
+        print("cheksum", checksum)
         header_final += struct.pack('!H',checksum) #cheksum calculado previamente
-        header_final += b'\x00\x00' #Por defecto 0
+        #header_final += b'\x00\x00' #Por defecto 0
         header_final += myIP #Ip origen
         header_final += dstIP.to_bytes(4, byteorder='big') #Ip destino
 
@@ -307,11 +325,14 @@ def sendIPDatagram(dstIP,data,protocol):
         #Enviamos el datagrama
         if (dstIP.to_bytes(4, byteorder='big')[0] & netmask[0]) == (myIP[0] & netmask[0]):
             mac = ARPResolution(dstIP)
-            if sendEthernetFrame(header,len(header),b'\x08\x00',mac) == -1:
+            print("Envio datagrama en mi subred...\n")
+            print(header_final)
+            if sendEthernetFrame(header_final,len(header_final),b'\x08\x00',mac) == -1:
                 return False
         else:
+            print("Envio datagrama fuera de mi subred...\n")
             mac = ARPResolution(defaultGW)
-            if sendEthernetFrame(header,len(header),b'\x08\x00',mac) == -1:
+            if sendEthernetFrame(header_final,len(header_final),b'\x08\x00',mac) == -1:
                 return False
         IPID+=1
     else: #aqui fragmentamos

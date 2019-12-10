@@ -42,7 +42,7 @@ def process_UDP_datagram(us,header,data,srcIP):
         Retorno: Ninguno
 
     '''
-
+    print("PROCESS UDP DATAGRAM\n")
     logging.debug(data[0:2])            #puerto origen
     logging.debug(data[2:4])            #puerto destino
     logging.debug(data[10:])            #datos contenidos
@@ -67,7 +67,7 @@ def sendUDPDatagram(data,dstPort,dstIP):
             -dstIP: entero de 32 bits con la IP destino del datagrama UDP
         Retorno: True o False en función de si se ha enviado el datagrama correctamente o no 
     '''
-
+    print("SEND UDP DATAGRAM\n")
     datagrama = bytes()
     cabecera = bytes()
 
