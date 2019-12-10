@@ -70,10 +70,7 @@ if __name__ == "__main__":
             #Pasamos los datos de cadena a bytes
             data = data.encode()
     
-    if (startEthernetLevel(args.interface) != 0):
-        logging.error('Ethernet no inicializado')
-        sys.exit(-1)
-    
+    startEthernetLevel(args.interface)    
     initICMP()
     initUDP()
 

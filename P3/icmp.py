@@ -2,6 +2,7 @@ import ip
 from threading import Lock
 import struct
 import logging
+import time
 
 ICMP_PROTO = 1
 
@@ -112,25 +113,39 @@ def sendICMPMessage(data,type,code,icmp_id,icmp_seqnum,dstIP):
     '''
     global icmp_send_times
 
+    cabecera_prueba = bytes()
     cabecera = bytes()
+    mensaje_prueba = bytes()
     mensaje = bytes()
+
     if type == ICMP_ECHO_REQUEST_TYPE or type == ICMP_ECHO_REPLY_TYPE:
-        cabecera += type        #tipo de mensaje ICMP
-        cabecera += code       #code del icmp
-        cabecera += b'\x00\x00' #rellenamos checksum con ceros por ahora para calcularlo
-        cabecera += icmp_id.to_bytes(2, byteorder='big')
-        cabecera += icmp_seqnum.to_bytes(2, byteorder='big')
+        #Cabecera de prueba para comprobar checksum
+        cabecera_prueba += type.to_bytes(1, byteorder='big')        #tipo de mensaje ICMP
+        cabecera_prueba += code.to_bytes(1, byteorder='big')      #code del icmp
+        cabecera_prueba += b'\x00\x00' #rellenamos checksum con ceros por ahora para calcularlo
+        cabecera_prueba += icmp_id.to_bytes(2, byteorder='big')
+        cabecera_prueba += icmp_seqnum.to_bytes(2, byteorder='big')
 
         #calculamos ahora el checksum
-        mensaje += cabecera
+        mensaje_prueba += cabecera_prueba
+        mensaje_prueba += data
+
+
+        cabecera += type.to_bytes(1, byteorder='big')
+        cabecera += code.to_bytes(1, byteorder='big')
+        icmp_checksum = icmp_chksum(mensaje_prueba)
+        cabecera += icmp_checksum.to_bytes(2, byteorder='big')     #ojo el checksum se hace sobre cabecera_prueba + datos
+        cabecera_prueba += icmp_id.to_bytes(2, byteorder='big')
+        cabecera_prueba += icmp_seqnum.to_bytes(2, byteorder='big')
+
+        mensaje += cabecera_prueba
         mensaje += data
-        mensaje[3:4] = icmp_chksum(mensaje)     #ojo el checksum se hace sobre cabecera + datos
 
         if type == ICMP_ECHO_REQUEST_TYPE:
             with timeLock:
-                icmp_send_times[dstIp+icmp_id+icmp_seqnum] = time.time()
+                icmp_send_times[dstIP+icmp_id+icmp_seqnum] = time.time()
 
-        ip.sendIPDatagram(dstIp, mensaje, ICMP_PROTO)           #ojo esto es un enteor
+        ip.sendIPDatagram(dstIP, mensaje, ICMP_PROTO)           #ojo esto es un entero
 
     else:
         return False

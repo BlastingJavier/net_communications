@@ -200,10 +200,9 @@ def initIP(interface,opts=None):
             -opts: array de bytes con las opciones a nivel IP a incluir en los datagramas o None si no hay opciones a añadir
         Retorno: True o False en función de si se ha inicializado el nivel o no
     '''
-    import pdb
-    pdb.set_trace()
     if initARP(interface) == False:
         return False
+
     myIP = getIP(interface)
     myIP = myIP.to_bytes(4, byteorder='big')
     MTU = getMTU(interface)
@@ -259,12 +258,14 @@ def sendIPDatagram(dstIP,data,protocol):
     primer_byte = "{0:b}".format(4) #Version
     primer_byte = "0" + primer_byte
     tam_header = 20 + longitud_opciones
+    print("TAM\n", tam_header)
     tam_header = tam_header/4
-    primer_byte += "{0:b}".format(tam_header)
+    primer_byte += "{0:b}".format(int(tam_header))
     if len(primer_byte) < 8:
-        primer_byte = primer_byte + "0"
+        primer_byte = "0" + primer_byte
 
-    header[0:1] = getbytes(primer_byte)
+    for b in getbytes(iter(primer_byte)):
+        print("PRUEBA\n", b)
     
     header += b'\x00' #Type of service
     header += bytes([20+longitud_opciones+len(data)]) #Longitud total del datagrama
@@ -369,5 +370,5 @@ def getbytes(bits):
             except StopIteration:
                 bit = 0
                 done = True
-            byte = (byte << 1) | bit
+            byte = (byte << 1) | int(bit)
         yield byte

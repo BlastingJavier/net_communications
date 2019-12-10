@@ -271,7 +271,7 @@ def initARP(interface):
         return False
 
     arpInitialized = True
-    return 0
+    return True
 
 def ARPResolution(ip):
     '''

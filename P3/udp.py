@@ -1,6 +1,7 @@
 import ip
 import struct
 import logging
+import socket
 
 UDP_HLEN = 8
 UDP_PROTO = 17
