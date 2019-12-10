@@ -251,25 +251,31 @@ def sendIPDatagram(dstIP,data,protocol):
         longitud_opciones = len(ipOpts)
 
     header = bytes()
+    header_final = bytes()
     #primer_byte = bytes()
 
     tam_header = bytearray()
     #header += b'\x00'
     primer_byte = "{0:b}".format(4) #Version
     primer_byte = "0" + primer_byte
-    tam_header = 20 + longitud_opciones
-    print("TAM\n", tam_header)
-    tam_header = tam_header/4
-    primer_byte += "{0:b}".format(int(tam_header))
-    if len(primer_byte) < 8:
-        primer_byte = "0" + primer_byte
 
-    for b in getbytes(iter(primer_byte)):
-        print("PRUEBA\n", b)
-    
+    tam_header = 20 + longitud_opciones
+    tam_header = tam_header/4
+    primer_byte += "0" + "{0:b}".format(int(tam_header))
+
+    dato = 0x00
+
+    i = 0
+    b = 7
+    while i < 8:
+        dato=dato|(int(primer_byte[i])<<b)
+        i+=1
+        b-=1
+
+    header += bytes(hex(dato),encoding='utf8') #Version e IHL
     header += b'\x00' #Type of service
     header += bytes([20+longitud_opciones+len(data)]) #Longitud total del datagrama
-    header += bytes([IPID])
+    header += bytes([IPID]) #Identificador
 
     if len(data)+longitud_opciones+20 <= MTU: #enviamos paquete completo
         header += b'\x00\x00' #Flags + offset
@@ -281,11 +287,25 @@ def sendIPDatagram(dstIP,data,protocol):
         if(ipOpts != None):
             header += ipOpts
         checksum = chksum(header)
-        header[11:13] = struct.pack('!H',checksum)
+
+
+
+        header_final += bytes(hex(dato),encoding='utf8') #Version e IHL
+        header_final += b'\x00' #Type of service
+        header_final += bytes([20+longitud_opciones+len(data)]) #Longitud total del datagrama
+        header_final += bytes([IPID]) #Identificador
+        header_final += b'\x00\x00' #Flags + offset
+        header_final += b'\x40' #Time to live
+        header_final += protocol.to_bytes(1, byteorder='big') #protocolo
+        header_final += struct.pack('!H',checksum) #cheksum calculado previamente
+        header_final += b'\x00\x00' #Por defecto 0
+        header_final += myIP #Ip origen
+        header_final += dstIP.to_bytes(4, byteorder='big') #Ip destino
+
         header += data
 
         #Enviamos el datagrama
-        if (dstIP.to_bytes(4, byteorder='big') & netmask) == (myIP & netmask):
+        if (dstIP.to_bytes(4, byteorder='big')[0] & netmask[0]) == (myIP[0] & netmask[0]):
             mac = ARPResolution(dstIP)
             if sendEthernetFrame(header,len(header),b'\x08\x00',mac) == -1:
                 return False
@@ -359,16 +379,3 @@ def sendIPDatagram(dstIP,data,protocol):
                 IPID+=1
     return True
 
-#Funcion complementaria para transformar bits a bytes
-def getbytes(bits):
-    done = False
-    while not done:
-        byte = 0
-        for _ in range(0, 8):
-            try:
-                bit = next(bits)
-            except StopIteration:
-                bit = 0
-                done = True
-            byte = (byte << 1) | int(bit)
-        yield byte
