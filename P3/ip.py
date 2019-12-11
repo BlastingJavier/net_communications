@@ -140,7 +140,7 @@ def process_IP_datagram(us,header,data,srcMac):
     print(data[29:33]) ip origen
     print(data[33:37]) ip destino"""
 
-    #if chksum(data) != 0:
+    #if chksum(data[14:]) != 0:
     #    print("error cheksum\n")
     #    return
 
@@ -260,9 +260,10 @@ def sendIPDatagram(dstIP,data,protocol):
     if(ipOpts != None):
         longitud_opciones = len(ipOpts)
 
-    header = bytes()
+    header = bytes() #Header auxiliar para calcular el checksum
     header_final = bytes()
     #primer_byte = bytes()
+    tamanio_datagrama = 20+longitud_opciones+len(data)
 
     tam_header = bytearray()
     #header += b'\x00'
@@ -271,13 +272,13 @@ def sendIPDatagram(dstIP,data,protocol):
 
     tam_header = 20 + longitud_opciones
     tam_header = tam_header/4
-    primer_byte += "0" + "{0:b}".format(int(tam_header))
+    primer_byte += "{0:b}".format(int(tam_header))
 
     dato = 0x00
 
     i = 0
     b = 7
-    while i < 8:
+    while i < len(primer_byte):
         dato=dato|(int(primer_byte[i])<<b)
         i+=1
         b-=1
@@ -288,7 +289,7 @@ def sendIPDatagram(dstIP,data,protocol):
 
     header += dato.to_bytes(1, byteorder='big') #Version e IHL
     header += b'\x00' #Type of service
-    header += bytes([20+longitud_opciones+len(data)]) #Longitud total del datagrama
+    header += tamanio_datagrama.to_bytes(2, byteorder='big') #Longitud total del datagrama
     header += bytes([IPID]) #Identificador
 
     if len(data)+longitud_opciones+20 <= MTU: #enviamos paquete completo
@@ -308,7 +309,6 @@ def sendIPDatagram(dstIP,data,protocol):
 
         header_final += dato.to_bytes(1, byteorder='big')
         header_final += b'\x00' #Type of service
-        tamanio_datagrama = 20+longitud_opciones+len(data)
         print("Tamanio datagrama", tamanio_datagrama.to_bytes(2, byteorder='big'))
         header_final += tamanio_datagrama.to_bytes(2, byteorder='big') #Longitud total del datagrama
         print("IPID", IPID.to_bytes(2, byteorder='big'))
@@ -322,7 +322,9 @@ def sendIPDatagram(dstIP,data,protocol):
         #header_final += b'\x00\x00' #Por defecto 0
         header_final += myIP #Ip origen
         header_final += dstIP.to_bytes(4, byteorder='big') #Ip destino
-
+        print("Opciones", ipOpts)
+        if(ipOpts != None):
+            header_final += ipOpts
         header_final += data
 
         #Enviamos el datagrama
@@ -339,6 +341,13 @@ def sendIPDatagram(dstIP,data,protocol):
                 return False
         IPID+=1
     else: #aqui fragmentamos
+        header_fragmento = bytes()
+
+        header += dato.to_bytes(1, byteorder='big') #Version e IHL
+        header += b'\x00' #Type of service
+        header += tamanio_datagrama.to_bytes(2, byteorder='big') #Longitud total del datagrama
+        header += bytes([IPID]) #Identificador
+
         tam_max_fragmento = MTU - 20 - longitud_opciones
         aux = tam_max_fragmento
         while(aux % 8 != 0):                                       #creo que esto esta mal
@@ -362,32 +371,103 @@ def sendIPDatagram(dstIP,data,protocol):
             if(ipOpts != None):
                 header += ipOpts
 
+            checksum = chksum(header)
+
             #Enviamos el primer fragmento
             if i == 0:
-                header[6:7] = (header[6:7] | b'\x20')
-                header[7:8] = (header[7:8] | b'\x00')
+                #Creamos el fragmento que vamos a enviar  partir de la cabecera (header base)
+
+                header_fragmento += dato.to_bytes(1, byteorder='big') #Version e IHL
+                header_fragmento += b'\x00' #Type of service
+                header_fragmento += tamanio_datagrama.to_bytes(2, byteorder='big') #Longitud total del datagrama
+                header_fragmento += bytes([IPID]) #Identificador
+                offset_flags_ini = 0x0000
+                offset_flags_ini = offset_flags_ini |(1 << 13)
+                header_fragmento += offset_flags_ini.to_bytes(2, byteorder='big') #Banderas IP y offset
+                header_fragmento += b'\x40' #Time to live
+                header_fragmento += protocol.to_bytes(1, byteorder='big')
+                header_fragmento += struct.pack('!H',checksum)
+                header_fragmento += myIP
+                header_fragmento += dstIP.to_bytes(4, byteorder='big')
+                if(ipOpts != None):
+                    header_fragmento += ipOpts
+
+                
             #Enviamos el ultimo fragmento
             elif i == num_fragmento-1:
                 #este ultimo tiene tamanyo (tam_max_fragmento - el anterior el de arriba del todo) - tam_max_fragmento (el de ahora)
+
+                header_fragmento += dato.to_bytes(1, byteorder='big') #Version e IHL
+                header_fragmento += b'\x00' #Type of service
+                header_fragmento += tamanio_datagrama.to_bytes(2, byteorder='big') #Longitud total del datagrama
+                header_fragmento += bytes([IPID]) #Identificador
+
+
+                offset_flags = 0x0000
                 offset += tam_max_fragmento / 8
-                header[6:8] = (b'\x00' << 8 | offset.to_bytes(2, byteorder='big'))
+                offset_bits = "{0:b}".format(int(offset))
+                print("offset", offset_bits)
+                print("offset", offset)
+                i=len(offset_bits)-1
+                for bit in offset_bits:
+                    offset_flags=offset_flags|(int(bit) << i) #Offset
+                    i-=1
+
+
+                
+                header_fragmento += (b'\x00' << 8 | offset.to_bytes(2, byteorder='big')) #Banderas IP y offset
+                header_fragmento += b'\x40' #Time to live
+                header_fragmento += protocol.to_bytes(1, byteorder='big')
+                header_fragmento += struct.pack('!H',checksum)
+                header_fragmento += myIP
+                header_fragmento += dstIP.to_bytes(4, byteorder='big')
+                if(ipOpts != None):
+                    header_fragmento += ipOpts
+               
             #Enviamos el resto de fragmentos
             else:
-                offset += tam_max_fragmento/8
-                tam_max_fragmento = tam_max_fragmento + tam_max_fragmento
-                header[6:8] = (b'\x20' << 8 | offset.to_bytes(2, byteorder='big'))
 
+                header_fragmento += dato.to_bytes(1, byteorder='big') #Version e IHL
+                header_fragmento += b'\x00' #Type of service
+                header_fragmento += tamanio_datagrama.to_bytes(2, byteorder='big') #Longitud total del datagrama
+                header_fragmento += bytes([IPID]) #Identificador
+                offset += tam_max_fragmento/8 
+                offset_flags = 0x0000
+                offset_bits = "{0:b}".format(int(offset))
+
+                i=len(offset_bits)-1
+                for bit in offset_bits:
+                    print("bit", bit)
+                    offset_flags=offset_flags|(int(bit) << i) #Offset
+                    i-=1
+
+                uno = 1
+                offset_flags=offset_flags|(uno << 13) #MF = 1     
+                print("HEX", offset_flags.to_bytes(2, byteorder='big'))
+                    
+
+                tam_max_fragmento = tam_max_fragmento + tam_max_fragmento
+                header_fragmento += offset_flags.to_bytes(2, byteorder='big')
+                header_fragmento += b'\x40' #Time to live
+                header_fragmento += protocol.to_bytes(1, byteorder='big')
+                header_fragmento += struct.pack('!H',checksum)
+                header_fragmento += myIP
+                header_fragmento += dstIP.to_bytes(4, byteorder='big')
+                if(ipOpts != None):
+                    header_fragmento += ipOpts
 
             #para no liarse tanto
-            if (dstIP.to_bytes(4, byteorder='big') & netmask) == (myIP & netmask): #si esta en mi subred
+            if (dstIP.to_bytes(4, byteorder='big')[0] & netmask[0]) == (myIP[0] & netmask[0]): #si esta en mi subred
                 mac = ARPResolution(dstIP)
                 if sendEthernetFrame(header,len(header),b'\x08\x00',mac) == -1:
                     return False
+                header_fragmento = bytes()
             else:
                 mac = ARPResolution(defaultGW)
                 if sendEthernetFrame(header,len(header),b'\x08\x00',mac) == -1:
                     return False
-            IPID+=1 #mira a ver esto, creo que esta mal dice que es de cada datagrama no fragmento pero...
+                header_fragmento = bytes()
+            #IPID+=1 mira a ver esto, creo que esta mal dice que es de cada datagrama no fragmento pero...
 
     return True
 
