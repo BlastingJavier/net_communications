@@ -140,27 +140,24 @@ def process_IP_datagram(us,header,data,srcMac):
     print(data[29:33]) ip origen
     print(data[33:37]) ip destino"""
 
-    if chksum(data[14:37]) != 0:
-        print("error cheksum\n")
-        return
-
-
+    #if chksum(data) != 0:
+    #    print("error cheksum\n")
+    #    return
 
     if data[23:25] == '0x0000':
         print("No reensamblar")
         return
 
+    logging.debug(data[14:15]) #IHL (Longitud de cabecera)
+    logging.debug(data[18:20]) #IPID
+    logging.debug(data[20:22]) #DF, MF y offset
+    logging.debug(data[26:30]) #IP origen
+    logging.debug(data[30:34]) #IP destino
+    logging.debug(data[23:24]) #Protocolo
 
-    logging.debug(data[14:18]) #IHL (Longitud de cabecera)
-    logging.debug(data[21:23]) #IPID
-    logging.debug(data[23:25]) #DF, MF y offset
-    logging.debug(data[29:33]) #IP origen
-    logging.debug(data[33:37]) #IP destino
-    logging.debug(data[26:27]) #Protocolo
-
-    if bytes(data[26:27]) in protocols:
-        funcion = protocols[data[26:27]]
-        funcion(us,header,data,data[14:37])
+    if bytes(data[23:24]) in protocols:
+        funcion = protocols[data[23:24]]
+        funcion(us,header,data,data[34:])
 
 
 def registerIPProtocol(callback,protocol):
@@ -285,7 +282,11 @@ def sendIPDatagram(dstIP,data,protocol):
         i+=1
         b-=1
 
-    header += bytes(hex(dato),encoding='utf8') #Version e IHL
+    print("primero", primer_byte)
+    print("dato",dato)
+
+
+    header += dato.to_bytes(1, byteorder='big') #Version e IHL
     header += b'\x00' #Type of service
     header += bytes([20+longitud_opciones+len(data)]) #Longitud total del datagrama
     header += bytes([IPID]) #Identificador
@@ -303,7 +304,9 @@ def sendIPDatagram(dstIP,data,protocol):
 
 
 
-        header_final += bytes(hex(dato),encoding='utf8') #Version e IHL
+        #header_final += bytes(hex(dato),encoding='utf8') #Version e IHL
+
+        header_final += dato.to_bytes(1, byteorder='big')
         header_final += b'\x00' #Type of service
         tamanio_datagrama = 20+longitud_opciones+len(data)
         print("Tamanio datagrama", tamanio_datagrama.to_bytes(2, byteorder='big'))
@@ -320,7 +323,7 @@ def sendIPDatagram(dstIP,data,protocol):
         header_final += myIP #Ip origen
         header_final += dstIP.to_bytes(4, byteorder='big') #Ip destino
 
-        header += data
+        header_final += data
 
         #Enviamos el datagrama
         if (dstIP.to_bytes(4, byteorder='big')[0] & netmask[0]) == (myIP[0] & netmask[0]):
