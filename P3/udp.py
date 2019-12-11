@@ -2,7 +2,7 @@ import ip
 import struct
 import logging
 import socket
-
+import pdb
 UDP_HLEN = 8
 UDP_PROTO = 17
 
@@ -67,6 +67,7 @@ def sendUDPDatagram(data,dstPort,dstIP):
             -dstIP: entero de 32 bits con la IP destino del datagrama UDP
         Retorno: True o False en función de si se ha enviado el datagrama correctamente o no 
     '''
+    #pdb.set_trace()
     print("SEND UDP DATAGRAM\n")
     datagrama = bytes()
     cabecera = bytes()
@@ -80,6 +81,8 @@ def sendUDPDatagram(data,dstPort,dstIP):
     datagrama += data
 
     ip.sendIPDatagram(dstIP, datagrama, UDP_PROTO)
+
+
 def initUDP():
     '''
         Nombre: initUDP

@@ -3,7 +3,7 @@ from threading import Lock
 import struct
 import logging
 import time
-
+import pdb
 ICMP_PROTO = 1
 
 
@@ -113,10 +113,11 @@ def sendICMPMessage(data,type,code,icmp_id,icmp_seqnum,dstIP):
     '''
     global icmp_send_times
 
+    #pdb.set_trace()
     cabecera_prueba = bytes()
     cabecera = bytes()
     mensaje_prueba = bytes()
-    mensaje = bytes()
+    datagrama = bytes()
 
     if type == ICMP_ECHO_REQUEST_TYPE or type == ICMP_ECHO_REPLY_TYPE:
         #Cabecera de prueba para comprobar checksum
@@ -135,17 +136,17 @@ def sendICMPMessage(data,type,code,icmp_id,icmp_seqnum,dstIP):
         cabecera += code.to_bytes(1, byteorder='big')
         icmp_checksum = icmp_chksum(mensaje_prueba)
         cabecera += icmp_checksum.to_bytes(2, byteorder='big')     #ojo el checksum se hace sobre cabecera_prueba + datos
-        cabecera_prueba += icmp_id.to_bytes(2, byteorder='big')
-        cabecera_prueba += icmp_seqnum.to_bytes(2, byteorder='big')
+        cabecera += icmp_id.to_bytes(2, byteorder='big')
+        cabecera += icmp_seqnum.to_bytes(2, byteorder='big')
 
-        mensaje += cabecera_prueba
-        mensaje += data
+        datagrama += cabecera
+        datagrama += data
 
         if type == ICMP_ECHO_REQUEST_TYPE:
             with timeLock:
                 icmp_send_times[dstIP+icmp_id+icmp_seqnum] = time.time()
 
-        ip.sendIPDatagram(dstIP, mensaje, ICMP_PROTO)           #ojo esto es un entero
+        ip.sendIPDatagram(dstIP, datagrama, ICMP_PROTO)           #ojo esto es un entero
 
     else:
         return False

@@ -81,6 +81,7 @@ if __name__ == "__main__":
     
     while True:
         try:
+            #pdb.set_trace()
             msg = input('Introduzca opcion:\n\t1.Enviar ping\n\t2.Enviar datagrama UDP:')
             if msg == 'q':
                 break
