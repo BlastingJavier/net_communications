@@ -72,17 +72,22 @@ def process_ICMP_message(us,header,data,srcIp):
     logging.debug("Codigo :{}".format(data[1:2])) #debug valor
 
     if struct.unpack('!B',data[:1])[0] == ICMP_ECHO_REQUEST_TYPE:
-        #devolvemos el mensaje ahora reply con tipo reqply, codigo del reply id el que nos envian y seqnum tambien el que nos envian
+        #devolvemos el mensaje ahora reply con tipo reply, codigo del reply id el que nos envian y seqnum tambien el que nos envian
         #y solo los datos
         print("ahora vamos a enviar estos datos en forma de ping")
         print(data[8:])
-        sendICMPMessage(data[8:], ICMP_ECHO_REPLY_TYPE, 0, struct.unpack('!I',data[4:6])[0], struct.unpack('!I',data[6:8])[0], srcIp)
+        icmp_id = struct.unpack('!H',data[4:6])[0]
+        icmp_seqnum = struct.unpack('!H',data[6:8])[0]
+        srcIp = struct.unpack('!I', srcIp)[0]
+        sendICMPMessage(data[8:], ICMP_ECHO_REPLY_TYPE, 0, icmp_id, icmp_seqnum, srcIp)
     elif struct.unpack('!B',data[:1])[0] == ICMP_ECHO_REPLY_TYPE:
-        dstIp = srcIP
+        dstIp = srcIp
         icmp_id = data[4:6]
         icmp_seqnum = data[6:8]
         with timeLock:
-            rtt = icmp_send_times[dstIp+icmp_id+icmp_seqnum]
+            clave = bytes(dstIp+icmp_id+icmp_seqnum)
+            print("Leyendo clave", clave)
+            rtt = icmp_send_times[(clave)]
             rtt = header.ts.tv_sec - rtt                    #recepcion - tenvio es el tiempo total del paquete hasta haber llegado
             print("RTT:{}".format(rtt))
     else:
@@ -150,7 +155,10 @@ def sendICMPMessage(data,type,code,icmp_id,icmp_seqnum,dstIP):
 
         if type == ICMP_ECHO_REQUEST_TYPE:
             with timeLock:
-                icmp_send_times[dstIP+icmp_id+icmp_seqnum] = time.time()
+                clave = bytes(dstIP+icmp_id+icmp_seqnum)
+                print("Guardando clave", clave)
+                icmp_send_times[clave] = time.time()
+                
 
         ip.sendIPDatagram(dstIP, datagrama, ICMP_PROTO)           #ojo esto es un entero
 

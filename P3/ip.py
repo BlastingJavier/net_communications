@@ -314,20 +314,15 @@ def sendIPDatagram(dstIP,data,protocol):
 
         header_final += dato.to_bytes(1, byteorder='big')
         header_final += b'\x00' #Type of service
-        print("Tamanio datagrama", tamanio_datagrama.to_bytes(2, byteorder='big'))
         header_final += tamanio_datagrama.to_bytes(2, byteorder='big') #Longitud total del datagrama
-        print("IPID", IPID.to_bytes(2, byteorder='big'))
         header_final += IPID.to_bytes(2, byteorder='big') #Identificador
         header_final += b'\x00\x00' #Flags + offset
         header_final += b'\x40' #Time to live
-        print("protocolo", protocol.to_bytes(1, byteorder='big'))
         header_final += protocol.to_bytes(1, byteorder='big') #protocolo
-        print("cheksum", checksum)
         header_final += checksum.to_bytes(2, byteorder='little') #cheksum calculado previamente
         #header_final += b'\x00\x00' #Por defecto 0
         header_final += myIP #Ip origen
         header_final += dstIP.to_bytes(4, byteorder='big') #Ip destino
-        print("Opciones", ipOpts)
         if(ipOpts != None):
             header_final += ipOpts
 
