@@ -95,12 +95,12 @@ def processARPRequest(data,MAC):
 
     goodeth_frame = 0                             
 
-    senderEth = data[22: 28]     #MAC origen
+    senderEth = data[8: 14]     #MAC origen
     if senderEth != MAC:
         logging.error("La MAC de origen es la misma que la de la trama ARP enviada")
         return
-    senderIP = data[28: 32]    #IP origen
-    targetIP = data[38: 42]    
+    senderIP = data[14: 18]    #IP origen
+    targetIP = data[24: 28]
 
     if bytes(targetIP) == myIP:                                #si esta ip es el destinatario del arp_request -> somos el equipo que contesta
         arp_reply = createARPReply(senderIP, senderEth)             #enviamos una respuesta con el MAC del que nos envia y su ip
@@ -135,20 +135,14 @@ def processARPReply(data,MAC):
         Retorno: Ninguno
     '''
     global requestedIP,resolvedMAC,awaitingResponse,cache
-    header_limit = 8
-    senderEth_limit = 14
-    senderIP_limit = 18
-    targetEth_limit = 24
-    targetIP_limit = 28
-    goodeth_frame = 0
 
-    senderEth = data[22: 28]     #MAC origen
+    senderEth = data[8: 14]     #MAC origen
     if bytes(senderEth) != MAC:
         logging.error("La MAC de origen no es la misma que la de la trama ARP enviada")
         return
-    senderIP = data[28: 32]    #IP origen
-    targetEth = data[32: 38]
-    targetIP = data[38: 42]
+    senderIP = data[14: 18]    #IP origen
+    targetEth = data[18: 24]
+    targetIP = data[24: 28]
 
     if bytes(targetIP) == myIP:                                #si esta ip es el destinatario del arp_request -> somos el equipo que contesta
         if senderIP == requestedIP:                     #si nos esta contestando al que le hemos enviado request
@@ -234,14 +228,14 @@ def process_arp_frame(us,header,data,srcMac):
     #hw_type = 2 #los bytes que no cambian de una trama/ paquete de datos a otros
 
 
-    if data[14:16] == hw_type and data[16:18] == protocol_type and data[18:19] == hw_size and data[19:20] == protocol_size:
+    if data[0:2] == hw_type and data[2:4] == protocol_type and data[4:5] == hw_size and data[5:6] == protocol_size:
         logging.info("cabecera de ARP correcta -> 6 primeros bytes")
     else:
         logging.error("Cabecera erronea, trama incorrecta -> 6 primeros bytes")
 
-    if data[20:22] == b'\x00\x01':
+    if data[6:8] == b'\x00\x01':
         processARPRequest(data, srcMac)                     #request
-    elif data[20:22] == b'\x00\x02':
+    elif data[6:8] == b'\x00\x02':
         processARPReply(data, srcMac)                       #reply
     else:
         return

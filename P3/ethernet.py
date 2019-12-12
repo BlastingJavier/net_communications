@@ -73,19 +73,9 @@ def process_Ethernet_frame(us,header,data):
     ethertype = bytes(data[origin_limit:ethertype_limit])
 
     if ethernet_destino == broadcastAddr or ethernet_destino == macAddress:
-        """
-        if ethertype1 == ethertype:
-            funcion_callback = upperProtos[ethertype1]
-            funcion_callback(us, header, data, ethernet_origin)
-        elif ethertype2 == ethertype:
-            funcion_callback = upperProtos[ethertype2]
-            funcion_callback(us, header, data, ethernet_origin)
-        else:
-            return
-        """
         funcion = upperProtos.get(ethertype)
         if funcion:
-            funcion(us, header, data, ethernet_origin)
+            funcion(us, header, data[ethertype_limit:], ethernet_origin)
     else:
         return
 
@@ -245,8 +235,8 @@ def sendEthernetFrame(data,leng,etherType,dstMac):
         if macAddress is not None:
             trama += (macAddress) #Lo segundo sera la direccion de ethernet de origen
 
-        trama += (etherType)
-        trama += (data)
+        trama += etherType
+        trama += data
         tamanyo_paquete = len(trama)
         if tamanyo_paquete < ETH_FRAME_MIN:
             trama += (bytearray(ETH_FRAME_MIN-tamanyo_paquete)) #Rellenamos con 0's hasta cumplir con el tamaño minimo requerido

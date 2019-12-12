@@ -128,36 +128,39 @@ def process_IP_datagram(us,header,data,srcMac):
             -srcMac: MAC origen de la trama Ethernet que se ha recibido
         Retorno: Ninguno
     '''
-    """
-    print("AQUI",data[14:18])IHL
-    print(data[18:19]) type of service
-    print(data[19:21]) total length
-    print(data[21:23]) IPID
-    print(data[23:25]) Offset y flags
-    print(data[25:26]) time to live
-    print(data[26:27]) protocolo
-    print(data[27:29]) header cheksum
-    print(data[29:33]) ip origen
-    print(data[33:37]) ip destino"""
+    global ipOpts
 
-    """if chksum(data[14:]) != 0:
-        print("error cheksum\n")
-        return"""
+    if ipOpts is None:
+        print(data[:20])
+        if chksum(data[:20]) != 0:
+            print("error cheksum\n")
+            return
+        print("Header IP checksum correcto")
+    else:
+        if chksum(data[:60]) != 0:
+            print("error cheksum con opciones\n")
+            return
+        print("Header IP checksum correcto con opciones")
+
     print("PROCESS IP FRAME")
-    if data[23:25] == '0x0000':
+    if data[6:8] == '0x0000':
         print("No reensamblar")
         return
 
-    logging.debug(data[14:15]) #IHL (Longitud de cabecera)
-    logging.debug(data[18:20]) #IPID
-    logging.debug(data[20:22]) #DF, MF y offset
-    logging.debug(data[26:30]) #IP origen
-    logging.debug(data[30:34]) #IP destino
-    logging.debug(data[23:24]) #Protocolo
+    logging.debug("Longitud cabecera: {}".format(data[0:1])) #IHL (Longitud de cabecera)
+    logging.debug("IPID:{}".format(data[4:6])) #IPID
+    logging.debug("DF , MF y offset:{}".format(data[6:8])) #DF, MF y offset
+    logging.debug("Protocolo:{}".format(data[9:10])) #Protocolo
+    logging.debug("IP origen:{}".format(data[12:16])) #IP origen
+    logging.debug("IP destino:{}".format(data[16:20])) #IP destino
 
-    if bytes(data[23:24]) in protocols:
-        funcion = protocols[data[23:24]]
-        funcion(us,header,data,data[34:])
+    if struct.unpack('!B', data[9:10])[0] in protocols:
+        print("En ip tenemos protocolo de nivel superior :{}".format(struct.unpack('!B', data[9:10])[0]))
+        funcion = protocols[struct.unpack('!B', data[9:10])[0]]
+        if ipOpts is None:                  #si no hay opciones mandamos el payload desde el byte 20
+            funcion(us,header,data[20:],data[12:16])    #pasamos la IP origen es decir la que nos han enviado
+        else:
+            funcion(us,header,data[60:],data[12:16])
 
 
 def registerIPProtocol(callback,protocol):
@@ -266,17 +269,17 @@ def sendIPDatagram(dstIP,data,protocol):
     #primer_byte = bytes()
     tamanio_datagrama = 20+longitud_opciones+len(data)
 
-    print("TAmanio data", len(data))
+    print("Tamanio data", len(data))
 
     tam_header = bytearray()
     #header += b'\x00'
-    primer_byte = "{0:b}".format(4) #Version
-    primer_byte = "0" + primer_byte
+    primer_byte = "{0:04b}".format(4) #Version
 
     tam_header = 20 + longitud_opciones
-    tam_header = tam_header/4
-    primer_byte += "{0:b}".format(int(tam_header))
+    tam_header = tam_header//4
 
+    primer_byte += "{0:04b}".format(tam_header)
+    print(primer_byte)
     dato = 0x00
 
     i = 0
@@ -287,10 +290,12 @@ def sendIPDatagram(dstIP,data,protocol):
         b-=1
 
 
+    print(dato.to_bytes(1, byteorder='big'))
+
     header += dato.to_bytes(1, byteorder='big') #Version e IHL
     header += b'\x00' #Type of service
     header += tamanio_datagrama.to_bytes(2, byteorder='big') #Longitud total del datagrama
-    header += bytes([IPID]) #Identificador
+    header += IPID.to_bytes(2, byteorder='big') #Identificador
 
     if len(data)+longitud_opciones+20 <= MTU: #enviamos paquete completo
         header += b'\x00\x00' #Flags + offset
@@ -318,7 +323,7 @@ def sendIPDatagram(dstIP,data,protocol):
         print("protocolo", protocol.to_bytes(1, byteorder='big'))
         header_final += protocol.to_bytes(1, byteorder='big') #protocolo
         print("cheksum", checksum)
-        header_final += struct.pack('!H',checksum) #cheksum calculado previamente
+        header_final += checksum.to_bytes(2, byteorder='little') #cheksum calculado previamente
         #header_final += b'\x00\x00' #Por defecto 0
         header_final += myIP #Ip origen
         header_final += dstIP.to_bytes(4, byteorder='big') #Ip destino
@@ -326,6 +331,9 @@ def sendIPDatagram(dstIP,data,protocol):
         if(ipOpts != None):
             header_final += ipOpts
 
+        print("vamos a enviar unos datos", data)
+        print("con cabecera:", header_final)
+        print("y checksum:", checksum)
         header_final += data
 
         #Enviamos el datagrama

@@ -42,10 +42,10 @@ def process_UDP_datagram(us,header,data,srcIP):
         Retorno: Ninguno
 
     '''
-    print("PROCESS UDP DATAGRAM\n")
-    logging.debug(data[0:2])            #puerto origen
-    logging.debug(data[2:4])            #puerto destino
-    logging.debug(data[10:])            #datos contenidos
+    print("PROCESS UDP DATAGRAM")
+    logging.debug("puerto origen: {}".format(data[0:2]))            #puerto origen
+    logging.debug("puerto destino: {}".format(data[2:4]))            #puerto destino
+    logging.debug("datos contenidos: {}".format(data[8:]))            #datos contenidos
 
     
 
@@ -74,7 +74,7 @@ def sendUDPDatagram(data,dstPort,dstIP):
 
     cabecera += getUDPSourcePort().to_bytes(2, byteorder='big')             #source
     cabecera += dstPort.to_bytes(2, byteorder='big')                        #dst
-    cabecera += (len(cabecera) + len(data)).to_bytes(2, byteorder='big')    #leg
+    cabecera += (8 + len(data)).to_bytes(2, byteorder='big')    #8 bytes de la cabecera + datos que vienen
     cabecera += b'\x00\x00'                                                 #checksum -> lo pondremos siempre a 0
 
     datagrama += cabecera

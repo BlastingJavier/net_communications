@@ -62,18 +62,24 @@ def process_ICMP_message(us,header,data,srcIp):
     '''
     global icmp_send_times
     if icmp_chksum(data) != 0:
-        logging.error('chechsum icmp incorrecto')
+        logging.error('checksum icmp incorrecto')
         return
+    else:
+        print("checksum icmp correcto")    
 
-    logging.debug(data[:1])         #debug tipo codigo
-    logging.debug(data[1:2])        #debug valor
+    print("PROCESS ICMP MESSAGE")
+    logging.debug("Tipo icmp:{}".format(data[:1])) #debug tipo codigo
+    logging.debug("Codigo :{}".format(data[1:2])) #debug valor
 
-    if data[:1] == ICMP_ECHO_REQUEST_TYPE:
+    if struct.unpack('!B',data[:1])[0] == ICMP_ECHO_REQUEST_TYPE:
         #devolvemos el mensaje ahora reply con tipo reqply, codigo del reply id el que nos envian y seqnum tambien el que nos envian
-        sendICMPMessage(data, ICMP_ECHO_REPLY_TYPE, b'\x00', struct.unpack('!I',data[4:6])[0], struct.unpack('!I',data[6:8])[0], srcIp)
-    elif data[:1] == ICMP_ECHO_REPLY_TYPE:
+        #y solo los datos
+        print("ahora vamos a enviar estos datos en forma de ping")
+        print(data[8:])
+        sendICMPMessage(data[8:], ICMP_ECHO_REPLY_TYPE, 0, struct.unpack('!I',data[4:6])[0], struct.unpack('!I',data[6:8])[0], srcIp)
+    elif struct.unpack('!B',data[:1])[0] == ICMP_ECHO_REPLY_TYPE:
         dstIp = srcIP
-        icmp_id = data[4:5]
+        icmp_id = data[4:6]
         icmp_seqnum = data[6:8]
         with timeLock:
             rtt = icmp_send_times[dstIp+icmp_id+icmp_seqnum]
@@ -135,7 +141,7 @@ def sendICMPMessage(data,type,code,icmp_id,icmp_seqnum,dstIP):
         cabecera += type.to_bytes(1, byteorder='big')
         cabecera += code.to_bytes(1, byteorder='big')
         icmp_checksum = icmp_chksum(mensaje_prueba)
-        cabecera += icmp_checksum.to_bytes(2, byteorder='big')     #ojo el checksum se hace sobre cabecera_prueba + datos
+        cabecera += icmp_checksum.to_bytes(2, byteorder='little')     #ojo el checksum se hace sobre cabecera_prueba + datos
         cabecera += icmp_id.to_bytes(2, byteorder='big')
         cabecera += icmp_seqnum.to_bytes(2, byteorder='big')
 
@@ -151,7 +157,6 @@ def sendICMPMessage(data,type,code,icmp_id,icmp_seqnum,dstIP):
     else:
         return False
 
-    message = bytes()
 
 def initICMP():
     '''
