@@ -140,10 +140,10 @@ def process_IP_datagram(us,header,data,srcMac):
     print(data[29:33]) ip origen
     print(data[33:37]) ip destino"""
 
-    #if chksum(data[14:]) != 0:
-    #    print("error cheksum\n")
-    #    return
-
+    """if chksum(data[14:]) != 0:
+        print("error cheksum\n")
+        return"""
+    print("PROCESS IP FRAME")
     if data[23:25] == '0x0000':
         print("No reensamblar")
         return
@@ -256,6 +256,7 @@ def sendIPDatagram(dstIP,data,protocol):
 
     '''
     #pdb.set_trace()
+    tamanio_fragmento = 0
     longitud_opciones = 0
     if(ipOpts != None):
         longitud_opciones = len(ipOpts)
@@ -264,6 +265,8 @@ def sendIPDatagram(dstIP,data,protocol):
     header_final = bytes()
     #primer_byte = bytes()
     tamanio_datagrama = 20+longitud_opciones+len(data)
+
+    print("TAmanio data", len(data))
 
     tam_header = bytearray()
     #header += b'\x00'
@@ -282,9 +285,6 @@ def sendIPDatagram(dstIP,data,protocol):
         dato=dato|(int(primer_byte[i])<<b)
         i+=1
         b-=1
-
-    print("primero", primer_byte)
-    print("dato",dato)
 
 
     header += dato.to_bytes(1, byteorder='big') #Version e IHL
@@ -325,6 +325,7 @@ def sendIPDatagram(dstIP,data,protocol):
         print("Opciones", ipOpts)
         if(ipOpts != None):
             header_final += ipOpts
+
         header_final += data
 
         #Enviamos el datagrama
@@ -345,15 +346,18 @@ def sendIPDatagram(dstIP,data,protocol):
 
         header += dato.to_bytes(1, byteorder='big') #Version e IHL
         header += b'\x00' #Type of service
-        header += tamanio_datagrama.to_bytes(2, byteorder='big') #Longitud total del datagrama
-        header += bytes([IPID]) #Identificador
+        
 
         tam_max_fragmento = MTU - 20 - longitud_opciones
         aux = tam_max_fragmento
-        while(aux % 8 != 0):                                       #creo que esto esta mal
+        while(aux % 8 != 0):                                       
             aux-=1
 
-        tam_max_fragmento = aux
+        tam_max_fragmento = aux #1480 en el ejemplo
+        tamanio_fragmento = tam_max_fragmento
+
+        header += tamanio_fragmento.to_bytes(2, byteorder='big') #Longitud total del fragmento
+        header += bytes([IPID]) #Identificador
 
         num_fragmento = len(data)/tam_max_fragmento
 
@@ -379,10 +383,10 @@ def sendIPDatagram(dstIP,data,protocol):
 
                 header_fragmento += dato.to_bytes(1, byteorder='big') #Version e IHL
                 header_fragmento += b'\x00' #Type of service
-                header_fragmento += tamanio_datagrama.to_bytes(2, byteorder='big') #Longitud total del datagrama
+                header_fragmento += tamanio_fragmento.to_bytes(2, byteorder='big') #Longitud total del datagrama
                 header_fragmento += bytes([IPID]) #Identificador
                 offset_flags_ini = 0x0000
-                offset_flags_ini = offset_flags_ini |(1 << 13)
+                offset_flags_ini = offset_flags_ini |(1 << 13) #MF = 1, offset = 0
                 header_fragmento += offset_flags_ini.to_bytes(2, byteorder='big') #Banderas IP y offset
                 header_fragmento += b'\x40' #Time to live
                 header_fragmento += protocol.to_bytes(1, byteorder='big')
@@ -392,30 +396,32 @@ def sendIPDatagram(dstIP,data,protocol):
                 if(ipOpts != None):
                     header_fragmento += ipOpts
 
+                header_fragmento += data[0:tam_max_fragmento]
+
                 
             #Enviamos el ultimo fragmento
             elif i == num_fragmento-1:
                 #este ultimo tiene tamanyo (tam_max_fragmento - el anterior el de arriba del todo) - tam_max_fragmento (el de ahora)
-
                 header_fragmento += dato.to_bytes(1, byteorder='big') #Version e IHL
                 header_fragmento += b'\x00' #Type of service
-                header_fragmento += tamanio_datagrama.to_bytes(2, byteorder='big') #Longitud total del datagrama
+                header_fragmento += tamanio_fragmento.to_bytes(2, byteorder='big') #Longitud total del datagrama
                 header_fragmento += bytes([IPID]) #Identificador
-
 
                 offset_flags = 0x0000
                 offset += tam_max_fragmento / 8
                 offset_bits = "{0:b}".format(int(offset))
-                print("offset", offset_bits)
-                print("offset", offset)
+
                 i=len(offset_bits)-1
                 for bit in offset_bits:
                     offset_flags=offset_flags|(int(bit) << i) #Offset
                     i-=1
-
-
                 
-                header_fragmento += (b'\x00' << 8 | offset.to_bytes(2, byteorder='big')) #Banderas IP y offset
+                cero = 0
+                offset_flags=offset_flags|(cero << 13) #MF = 0
+                offset_flags=offset_flags|(cero << 14) #DF = 0
+                offset_flags=offset_flags|(cero << 15) #Reservado 0
+
+                header_fragmento += offset_flags.to_bytes(2, byteorder='big') #Offset
                 header_fragmento += b'\x40' #Time to live
                 header_fragmento += protocol.to_bytes(1, byteorder='big')
                 header_fragmento += struct.pack('!H',checksum)
@@ -423,13 +429,14 @@ def sendIPDatagram(dstIP,data,protocol):
                 header_fragmento += dstIP.to_bytes(4, byteorder='big')
                 if(ipOpts != None):
                     header_fragmento += ipOpts
+                header_fragmento += data[tam_max_fragmento:]
                
             #Enviamos el resto de fragmentos
             else:
 
                 header_fragmento += dato.to_bytes(1, byteorder='big') #Version e IHL
                 header_fragmento += b'\x00' #Type of service
-                header_fragmento += tamanio_datagrama.to_bytes(2, byteorder='big') #Longitud total del datagrama
+                header_fragmento += tamanio_fragmento.to_bytes(2, byteorder='big') #Longitud total del datagrama
                 header_fragmento += bytes([IPID]) #Identificador
                 offset += tam_max_fragmento/8 
                 offset_flags = 0x0000
@@ -437,15 +444,13 @@ def sendIPDatagram(dstIP,data,protocol):
 
                 i=len(offset_bits)-1
                 for bit in offset_bits:
-                    print("bit", bit)
                     offset_flags=offset_flags|(int(bit) << i) #Offset
                     i-=1
 
                 uno = 1
                 offset_flags=offset_flags|(uno << 13) #MF = 1     
-                print("HEX", offset_flags.to_bytes(2, byteorder='big'))
                     
-
+                inicio_data = tam_max_fragmento
                 tam_max_fragmento = tam_max_fragmento + tam_max_fragmento
                 header_fragmento += offset_flags.to_bytes(2, byteorder='big')
                 header_fragmento += b'\x40' #Time to live
@@ -455,16 +460,20 @@ def sendIPDatagram(dstIP,data,protocol):
                 header_fragmento += dstIP.to_bytes(4, byteorder='big')
                 if(ipOpts != None):
                     header_fragmento += ipOpts
+                header_fragmento += data[inicio_data:tam_max_fragmento]
 
             #para no liarse tanto
             if (dstIP.to_bytes(4, byteorder='big')[0] & netmask[0]) == (myIP[0] & netmask[0]): #si esta en mi subred
                 mac = ARPResolution(dstIP)
-                if sendEthernetFrame(header,len(header),b'\x08\x00',mac) == -1:
+                print("Envio fragmento en mi subred")
+                if sendEthernetFrame(header_fragmento,len(header_fragmento),b'\x08\x00',mac) == -1:
+                    print("Error en envio")
                     return False
                 header_fragmento = bytes()
             else:
+                print("Envio fragmento fuera de mi subred")
                 mac = ARPResolution(defaultGW)
-                if sendEthernetFrame(header,len(header),b'\x08\x00',mac) == -1:
+                if sendEthernetFrame(header_fragmento,len(header_fragmento),b'\x08\x00',mac) == -1:
                     return False
                 header_fragmento = bytes()
             #IPID+=1 mira a ver esto, creo que esta mal dice que es de cada datagrama no fragmento pero...
